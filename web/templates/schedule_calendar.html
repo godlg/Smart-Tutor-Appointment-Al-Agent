@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排课日历 - 家教智能预约</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 22px; }
+        .header-links a {
+            color: white; text-decoration: none;
+            margin-left: 12px; padding: 6px 14px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 6px; font-size: 14px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+        .toolbar {
+            background: white;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .view-switch button {
+            padding: 8px 16px;
+            border: 1px solid #e0e6ed;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .view-switch button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .calendar {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .week-grid {
+            display: grid;
+            grid-template-columns: 60px repeat(7, 1fr);
+            gap: 4px;
+        }
+        .week-header {
+            text-align: center;
+            padding: 10px;
+            font-weight: 600;
+            color: #4a5568;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+        .time-col {
+            text-align: center;
+            color: #a0aec0;
+            font-size: 12px;
+            padding: 6px 0;
+        }
+        .day-col {
+            min-height: 600px;
+            background: #f7fafc;
+            border-radius: 6px;
+            position: relative;
+        }
+        .lesson-block {
+            margin: 2px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: white;
+            cursor: pointer;
+        }
+        .lesson-trial { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+        .lesson-series { background: linear-gradient(135deg, #fa709a, #fee140); color: #2d3748;}
+        .lesson-regular { background: linear-gradient(135deg, #43e97b, #38f9d7); color: #2d3748; }
+        .lesson-completed { opacity: 0.6; text-decoration: line-through; }
+        .lesson-cancelled { background: #cbd5e0; color: #718096; text-decoration: line-through;}
+        .legend {
+            background: white;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-color {
+            width: 14px; height: 14px;
+            border-radius: 4px;
+        }
+        .modal-bg {
+            position: fixed; top:0; left:0; right:0; bottom:0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-bg.show { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+        }
+        .modal h3 {
+            margin-bottom: 16px;
+            color: #2d3748;
+        }
+        .form-row {
+            margin-bottom: 12px;
+        }
+        .form-row label {
+            display: block;
+            font-size: 13px;
+            color: #718096;
+            margin-bottom: 4px;
+        }
+        .form-row select,
+        .form-row input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e0e6ed;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📅 排课日历</h1>
+        <div class="header-links">
+            <a href="/">💬 智能助手</a>
+            <a href="/teachers">👨‍🏫 老师库</a>
+            <a href="/lesson-series">📚 我的系列课</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="toolbar">
+            <div>
+                <span style="color:#718096;margin-right:8px;">查看：</span>
+                <div class="view-switch" style="display:inline-block;">
+                    <button class="active" onclick="switchView('week', this)">周视图</button>
+                    <button onclick="switchView('month', this)">月视图</button>
+                </div>
+            </div>
+            <div>
+                <button onclick="prevWeek()" style="padding:6px 12px;border:1px solid #e0e6ed;background:white;border-radius:6px;cursor:pointer;">← 上周</button>
+                <span id="week-range" style="margin:0 12px;color:#4a5568;"></span>
+                <button onclick="nextWeek()" style="padding:6px 12px;border:1px solid #e0e6ed;background:white;border-radius:6px;cursor:pointer;">下周 →</button>
+                <button onclick="openNewSeriesModal()" style="margin-left:12px;padding:8px 16px;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;">+ 新建周固定排课</button>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <span class="legend-color" style="background: linear-gradient(135deg, #4facfe, #00f2fe);"></span>
+                试讲课
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: linear-gradient(135deg, #fa709a, #fee140);"></span>
+                系列课（周固定）
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: linear-gradient(135deg, #43e97b, #38f9d7);"></span>
+                单次正式课
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #cbd5e0;"></span>
+                已取消
+            </div>
+        </div>
+
+        <div class="calendar">
+            <div class="week-grid" id="week-grid"></div>
+        </div>
+    </div>
+
+    <!-- 新建系列课 modal -->
+    <div class="modal-bg" id="new-series-modal">
+        <div class="modal">
+            <h3>🆕 新建周固定排课</h3>
+            <div class="form-row">
+                <label>老师</label>
+                <select id="modal-teacher"></select>
+            </div>
+            <div class="form-row">
+                <label>周几（可多选，逗号分隔）</label>
+                <input id="modal-weekdays" placeholder="如：周三,周五">
+            </div>
+            <div class="form-row">
+                <label>开始时间</label>
+                <input id="modal-time" type="time" value="19:00">
+            </div>
+            <div class="form-row">
+                <label>起始日期</label>
+                <input id="modal-start-date" type="date">
+            </div>
+            <div class="form-row">
+                <label>连排周数</label>
+                <input id="modal-weeks" type="number" value="12" min="1" max="52">
+            </div>
+            <div class="form-row">
+                <label>关联套餐（可选）</label>
+                <select id="modal-package">
+                    <option value="">不关联套餐</option>
+                </select>
+            </div>
+            <button class="btn-primary" onclick="submitNewSeries()">预览 + 创建</button>
+            <button onclick="document.getElementById('new-series-modal').classList.remove('show')" style="background:none;border:none;color:#718096;cursor:pointer;display:block;margin:8px auto 0;">取消</button>
+        </div>
+    </div>
+
+    <script>
+        const WEEKDAY_NAMES_CN = ['周一','周二','周三','周四','周五','周六','周日'];
+        const WEEKDAY_NAME_TO_IDX = {
+            '周一': 0, '周二': 1, '周三': 2, '周四': 3,
+            '周五': 4, '周六': 5, '周日': 6,
+        };
+        let currentWeekStart = getMondayOfThisWeek();
+
+        function getMondayOfThisWeek(d = new Date()) {
+            const day = d.getDay() || 7;
+            d.setDate(d.getDate() - day + 1);
+            d.setHours(0,0,0,0);
+            return d;
+        }
+
+        function fmtDate(d) {
+            return `${d.getMonth()+1}/${d.getDate()}`;
+        }
+
+        function renderCalendar(lessons) {
+            const grid = document.getElementById('week-grid');
+            grid.innerHTML = '';
+
+            // Header
+            grid.innerHTML += '<div class="time-col"></div>';
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(currentWeekStart);
+                d.setDate(d.getDate() + i);
+                grid.innerHTML += `<div class="week-header">${WEEKDAY_NAMES_CN[i]}<br><small style="font-weight:400;color:#a0aec0;">${fmtDate(d)}</small></div>`;
+            }
+
+            // Hour rows (12:00 to 22:00)
+            for (let h = 12; h <= 22; h++) {
+                grid.innerHTML += `<div class="time-col">${h}:00</div>`;
+                for (let i = 0; i < 7; i++) {
+                    const dayLessons = lessons.filter(l => {
+                        const dt = new Date(l.scheduled_at);
+                        return dt.getDay() === ((i + 1) % 7) && dt.getHours() === h;
+                    });
+                    const html = dayLessons.map(l => {
+                        const typeClass = `lesson-${l.lesson_type}`;
+                        const statusClass = l.status === 'completed' ? 'lesson-completed'
+                            : l.status === 'cancelled' ? 'lesson-cancelled' : '';
+                        const dt = new Date(l.scheduled_at);
+                        const time = `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+                        return `<div class="lesson-block ${typeClass} ${statusClass}"
+                                     onclick="showLesson(${JSON.stringify(l).replace(/"/g, '&quot;')})">
+                            <strong>${time}</strong> · ${l.lesson_type === 'trial' ? '试讲' : (l.lesson_type === 'series' ? '系列' : '正式')}
+                        </div>`;
+                    }).join('');
+                    grid.innerHTML += `<div class="day-col">${html}</div>`;
+                }
+            }
+
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            document.getElementById('week-range').textContent =
+                `${currentWeekStart.getFullYear()}-${fmtDate(currentWeekStart)} ~ ${fmtDate(weekEnd)}`;
+        }
+
+        async function loadLessons() {
+            try {
+                const res = await fetch('/api/lessons/');
+                const lessons = await res.json();
+                renderCalendar(lessons);
+            } catch (e) {
+                console.error(e);
+                alert('加载课时失败：' + e.message);
+            }
+        }
+
+        function prevWeek() {
+            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+            loadLessons();
+        }
+        function nextWeek() {
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+            loadLessons();
+        }
+        function switchView(view, btn) {
+            document.querySelectorAll('.view-switch button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            alert('月视图开发中，敬请期待。');
+        }
+
+        function showLesson(l) {
+            const dt = new Date(l.scheduled_at);
+            const message = l.status === 'cancelled'
+                ? `我想把 ${dt.toLocaleString('zh-CN')} 的取消课补上`
+                : `我想调整 ${dt.toLocaleString('zh-CN')} 的${l.lesson_type === 'trial' ? '试讲' : '课'}`;
+            window.location.href = `/?message=${encodeURIComponent(message)}`;
+        }
+
+        // ------- New Series Modal -------
+        async function openNewSeriesModal() {
+            document.getElementById('new-series-modal').classList.add('show');
+
+            // Load teachers
+            try {
+                const [teachersRes, packagesRes] = await Promise.all([
+                    fetch('/api/teachers/'),
+                    fetch('/api/packages/'),
+                ]);
+                const teachers = await teachersRes.json();
+                const packages = await packagesRes.json();
+
+                document.getElementById('modal-teacher').innerHTML =
+                    teachers.map(t => `<option value="${t.id}">${t.name} (${(t.subjects || []).join('/')})</option>`).join('');
+                document.getElementById('modal-package').innerHTML =
+                    '<option value="">不关联套餐</option>' +
+                    packages.map(p => `<option value="${p.id}">${p.name} - ¥${p.price_total}</option>`).join('');
+
+                const today = new Date();
+                const nextMon = getMondayOfThisWeek(today);
+                if (nextMon <= today) nextMon.setDate(nextMon.getDate() + 7);
+                document.getElementById('modal-start-date').value =
+                    nextMon.toISOString().slice(0, 10);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function submitNewSeries() {
+            const teacher_id = +document.getElementById('modal-teacher').value;
+            const weekdaysStr = document.getElementById('modal-weekdays').value.trim();
+            const time = document.getElementById('modal-time').value;
+            const start_date = document.getElementById('modal-start-date').value;
+            const total_weeks = +document.getElementById('modal-weeks').value;
+            const package_id = document.getElementById('modal-package').value;
+
+            const weekdayNames = weekdaysStr.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+            const weekly_pattern = weekdayNames.map(n => {
+                const idx = WEEKDAY_NAME_TO_IDX[n];
+                if (idx === undefined) throw new Error(`无效的星期：${n}`);
+                return {day_of_week: idx, time: time};
+            });
+
+            if (weekly_pattern.length === 0) {
+                alert('请填写至少一个周几');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/lessons/series/preview', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        teacher_id, student_id: 1,
+                        weekly_pattern, start_date, total_weeks,
+                        package_id: package_id ? +package_id : null,
+                    }),
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    alert('预览失败：' + JSON.stringify(data));
+                    return;
+                }
+
+                const conflictCount = (data.data.conflicts || []).length;
+                const warnCount = (data.data.warnings || []).length;
+                const lessonsCount = data.data.lessons_count;
+                const ok = confirm(
+                    `预览结果：\n` +
+                    `- 将创建 ${lessonsCount} 节课\n` +
+                    `- 跳过冲突 ${conflictCount} 处\n` +
+                    `- 警告 ${warnCount} 条\n\n` +
+                    `是否确认创建？`
+                );
+                if (!ok) return;
+
+                const createRes = await fetch('/api/lessons/series', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        teacher_id, student_id: 1,
+                        weekly_pattern, start_date, total_weeks,
+                        package_id: package_id ? +package_id : null,
+                    }),
+                });
+                const created = await createRes.json();
+                alert(created.success
+                        ? `✅ 创建成功！共生成 ${created.data.lessons_created} 节课`
+                        : `❌ 创建失败：${JSON.stringify(created)}`);
+                document.getElementById('new-series-modal').classList.remove('show');
+                loadLessons();
+            } catch (e) {
+                alert('创建失败：' + e.message);
+            }
+        }
+
+        loadLessons();
+    </script>
+</body>
+</html>

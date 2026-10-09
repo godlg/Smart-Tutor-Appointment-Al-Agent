@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学生档案 - 家教智能预约</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+        }
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 22px; }
+        .header-links a {
+            color: white; text-decoration: none;
+            margin-left: 12px; padding: 6px 14px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 6px; font-size: 14px;
+        }
+        .container { max-width: 960px; margin: 24px auto; padding: 0 20px; }
+        .profile-card {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .profile-section {
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .profile-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .profile-section h3 {
+            color: #2d3748;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+        .info-item label {
+            display: block;
+            font-size: 13px;
+            color: #a0aec0;
+            margin-bottom: 4px;
+        }
+        .info-item .value {
+            font-size: 16px;
+            color: #2d3748;
+            font-weight: 600;
+        }
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #e6f3ff;
+            color: #2c5282;
+            border-radius: 12px;
+            font-size: 13px;
+            margin: 2px 4px 2px 0;
+        }
+        .signal-strong { background: #c6f6d5; color: #22543d; }
+        .signal-weak { background: #feebc8; color: #7c2d12; }
+        .signal-none { background: #e2e8f0; color: #4a5568; }
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: white;
+        }
+        .btn-outline {
+            background: white;
+            border: 1px solid #e0e6ed;
+            color: #4a5568;
+        }
+        .signal-card {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            background: #f7fafc;
+            border-radius: 12px;
+            margin-right: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>👦 学生档案</h1>
+        <div class="header-links">
+            <a href="/">💬 智能助手</a>
+            <a href="/progress-dashboard">📈 进度看板</a>
+            <a href="/parent-center">🏠 家长中心</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="profile-card" id="profile-card">
+            <div style="text-align:center;color:#a0aec0;padding:60px;">加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        async function loadProfile() {
+            try {
+                const res = await fetch('/api/students/default');
+                if (!res.ok) throw new Error('未找到学生档案');
+                const s = await res.json();
+                renderProfile(s);
+            } catch (e) {
+                document.getElementById('profile-card').innerHTML =
+                    `<div style="text-align:center;color:#e53e3e;padding:60px;">加载失败：${e.message}</div>`;
+            }
+        }
+
+        function renderProfile(s) {
+            const signalClass = s.upsell_signal === 'strong' ? 'signal-strong'
+                : s.upsell_signal === 'weak' ? 'signal-weak' : 'signal-none';
+            const signalText = {strong: '续费信号：强', weak: '续费信号：弱', none: '续费信号：无'}[s.upsell_signal] || '续费信号：未知';
+
+            document.getElementById('profile-card').innerHTML = `
+                <div class="profile-section">
+                    <h3>📚 基本信息</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>姓名</label>
+                            <div class="value">${s.name}</div>
+                        </div>
+                        <div class="info-item">
+                            <label>年级段</label>
+                            <div class="value">${s.grade_level || '未填写'}</div>
+                        </div>
+                        <div class="info-item">
+                            <label>学校</label>
+                            <div class="value">${s.school || '未填写'}</div>
+                        </div>
+                        <div class="info-item">
+                            <label>偏好教学风格</label>
+                            <div class="value">${s.preferred_style || '未指定'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-section">
+                    <h3>🎯 学科与目标</h3>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:13px;color:#a0aec0;display:block;margin-bottom:6px;">薄弱学科</label>
+                        ${(s.weak_subjects || []).map(t => `<span class="tag" style="background:#fed7d7;color:#742a2a;">${t}</span>`).join('') || '<span style="color:#a0aec0;">未填写</span>'}
+                    </div>
+                    <div>
+                        <label style="font-size:13px;color:#a0aec0;display:block;margin-bottom:6px;">学习目标</label>
+                        ${(s.learning_goals || []).map(g => `<span class="tag" style="background:#c6f6d5;color:#22543d;">${g}</span>`).join('') || '<span style="color:#a0aec0;">未填写</span>'}
+                    </div>
+                </div>
+
+                ${s.notes ? `
+                <div class="profile-section">
+                    <h3>📝 备注</h3>
+                    <p style="color:#4a5568;line-height:1.6;">${s.notes}</p>
+                </div>
+                ` : ''}
+
+                <div class="profile-section">
+                    <h3>📊 画像信号</h3>
+                    <div class="signal-card">
+                        <span class="tag ${signalClass}">${signalText}</span>
+                    </div>
+                    <p style="color:#718096;font-size:13px;margin-top:12px;">
+                        💡 续费信号由试讲反馈、套餐完成度、活跃度自动计算。<br>
+                        您可以在聊天中告诉顾问：「更新 [孩子] 的目标是 XXX」来调整画像。
+                    </p>
+                </div>
+
+                <div class="actions">
+                    <button class="btn btn-primary" onclick="window.location.href='/?message=' + encodeURIComponent('我想更新 ${s.name} 的档案')">
+                        💬 通过聊天更新档案
+                    </button>
+                    <button class="btn btn-outline" onclick="window.location.href='/progress-dashboard'">
+                        📈 查看学习进度
+                    </button>
+                </div>
+            `;
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+{
+  "version": "1.0.0",
+  "description": "路由评估集: 意图分类正确性 (冻结样本, 勿随意改; 修改需 bump version)",
+  "expected_field": "expected_intent",
+  "intent_values": [
+    "consultation",
+    "trial",
+    "lesson",
+    "reschedule",
+    "cancel",
+    "package",
+    "progress",
+    "recommendation",
+    "recommendation_confirm",
+    "unrelated"
+  ],
+  "cases": [
+    {
+      "id": "routing_001",
+      "version": "1.0.0",
+      "input": "我家孩子数学不好，想请教一下学习方法",
+      "expected_intent": "consultation",
+      "note": "知识咨询: 学习方法"
+    },
+    {
+      "id": "routing_002",
+      "version": "1.0.0",
+      "input": "想让孩子试试张老师的课，约一节试讲",
+      "expected_intent": "trial",
+      "note": "试讲预约: 体验/试听"
+    },
+    {
+      "id": "routing_003",
+      "version": "1.0.0",
+      "input": "帮我预约明天下午3点的数学正式课",
+      "expected_intent": "lesson",
+      "note": "正式课预约"
+    },
+    {
+      "id": "routing_004",
+      "version": "1.0.0",
+      "input": "孩子这周三的课想调到周五晚上",
+      "expected_intent": "reschedule",
+      "note": "调课"
+    },
+    {
+      "id": "routing_005",
+      "version": "1.0.0",
+      "input": "我要取消上周约的那节试讲课",
+      "expected_intent": "cancel",
+      "note": "退课"
+    },
+    {
+      "id": "routing_006",
+      "version": "1.0.0",
+      "input": "你们的一对一辅导套餐多少钱？",
+      "expected_intent": "package",
+      "note": "套餐咨询"
+    },
+    {
+      "id": "routing_007",
+      "version": "1.0.0",
+      "input": "孩子最近上课情况怎么样，有进步吗",
+      "expected_intent": "progress",
+      "note": "进度查询"
+    },
+    {
+      "id": "routing_008",
+      "version": "1.0.0",
+      "input": "今天天气怎么样",
+      "expected_intent": "unrelated",
+      "note": "无关闲聊"
+    },
+    {
+      "id": "routing_009",
+      "version": "1.0.0",
+      "input": "高中数学12周提分方案都讲哪些内容？",
+      "expected_intent": "consultation",
+      "note": "知识咨询: 课程介绍"
+    },
+    {
+      "id": "routing_010",
+      "version": "1.0.0",
+      "input": "想约一节免费的试听体验课",
+      "expected_intent": "trial",
+      "note": "试讲口语变体"
+    },
+    {
+      "id": "routing_011",
+      "version": "1.0.0",
+      "input": "周六下午加一节物理正式课",
+      "expected_intent": "lesson",
+      "note": "正式课口语变体"
+    },
+    {
+      "id": "routing_012",
+      "version": "1.0.0",
+      "input": "请问初中数学一对一辅导一节课怎么收费",
+      "expected_intent": "package",
+      "note": "价格/收费类归套餐咨询"
+    }
+  ]
+}

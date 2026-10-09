@@ -1,0 +1,20 @@
+# 组件可插拔配置 (六类组件)
+#
+# 每类: type 决定实现, 其余 key 为构造参数。
+# 缺失某类 → 自动使用默认实现 (openai_compatible / recursive /
+# hybrid / bge / recall_at_k), 与现有代码行为一致。
+#
+# 切换实现示例:
+#   vector_store.type 改为 dense  → 纯 FAISS 检索 (KnowledgeService.search)
+#   vector_store.type 改为 bm25   → 纯 BM25 检索 (Bm25Index)
+#   vector_store.type 改为 hybrid → Dense + BM25 + RRF + 可选精排 (默认)
+#   reranker.type 改为 none       → 跳过精排, 原样返回候选
+#   evaluator.k 改为 5            → Recall@5 / MRR@5
+
+components:
+  llm: { type: openai_compatible, temperature: 0 }
+  embedding: { type: openai_compatible }
+  splitter: { type: recursive, chunk_size: 500, overlap: 50 }
+  vector_store: { type: hybrid, dense_top_n: 20, bm25_top_n: 20, rrf_k: 60 }
+  reranker: { type: bge }
+  evaluator: { type: recall_at_k, k: 3 }

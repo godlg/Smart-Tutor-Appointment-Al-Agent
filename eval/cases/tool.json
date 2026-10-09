@@ -1,0 +1,77 @@
+{
+  "version": "1.0.0",
+  "description": "工具调用评估集: run_agentic_trial_booking 入口, 断言 tool_called + 无异常 (不落真实生产库, 用临时 DB 隔离)",
+  "entry": "agents.agentic.agentic_trial_booking.run_agentic_trial_booking",
+  "cases": [
+    {
+      "id": "tool_001",
+      "version": "1.0.0",
+      "message": "请帮我预约张明老师明天晚上7点的试讲课",
+      "teacher_id": 1,
+      "time_iso": "2026-09-24 19:00",
+      "subject": "数学",
+      "expected_tool_called": true,
+      "note": "完整预约上下文: LLM 应调 book_trial_lesson"
+    },
+    {
+      "id": "tool_002",
+      "version": "1.0.0",
+      "message": "约一下周六下午2点的物理试讲",
+      "teacher_id": 1,
+      "time_iso": "2026-09-26 14:00",
+      "subject": "物理",
+      "expected_tool_called": true,
+      "note": "另一组完整参数"
+    },
+    {
+      "id": "tool_003",
+      "version": "1.0.0",
+      "message": "我想先了解一下你们试讲是怎么安排的",
+      "teacher_id": null,
+      "time_iso": null,
+      "subject": null,
+      "expected_tool_called": false,
+      "note": "缺参: 老师/时间都没有 → LLM 应选择对话而非调工具"
+    },
+    {
+      "id": "tool_004",
+      "version": "1.0.0",
+      "message": "帮我约张老师的试讲",
+      "teacher_id": 1,
+      "time_iso": null,
+      "subject": null,
+      "expected_tool_called": false,
+      "note": "缺时间: 不足以调工具 → tool_called=False"
+    },
+    {
+      "id": "tool_005",
+      "version": "1.0.0",
+      "message": "预约 2026-09-25 20:00 的英语试讲",
+      "teacher_id": 1,
+      "time_iso": "2026-09-25 20:00",
+      "subject": "英语",
+      "expected_tool_called": true,
+      "note": "英语试讲完整参数"
+    },
+    {
+      "id": "tool_006",
+      "version": "1.0.0",
+      "message": "这周日早上9点可以约化学试讲吗",
+      "teacher_id": 1,
+      "time_iso": "2026-09-27 09:00",
+      "subject": "化学",
+      "expected_tool_called": true,
+      "note": "口语问句形态仍应调工具"
+    },
+    {
+      "id": "tool_007",
+      "version": "1.0.0",
+      "message": "你好",
+      "teacher_id": null,
+      "time_iso": null,
+      "subject": null,
+      "expected_tool_called": false,
+      "note": "纯寒暄: 不调工具"
+    }
+  ]
+}

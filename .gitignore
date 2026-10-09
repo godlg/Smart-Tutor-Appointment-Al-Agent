@@ -1,0 +1,89 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+develop-eggs/
+.installed.cfg
+pip-wheel-metadata/
+*.manifest
+*.spec
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Environment & secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Data & runtime artifacts ---
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.faiss
+*.index
+*.pkl
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Tests / coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# --- 本地模型缓存(精排 ONNX ~370MB, 不入库) ---
+cache/
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Ad-hoc local scripts (project root) ---
+/_syntax_check.py
+/_launch8002.ps1
+
+# --- 本地调试产物 ---
+/scratch_*.txt
+/timing.db
+/ff_full.txt
+/report.json
+/jn_*.html
+/architecture .jpg
+/面试准备问题.md
+
+# --- 个人材料（不随仓库发布）---
+/resume/
+/docs/interview/
+
+# --- 个人材料与本地开发笔记（不发布）---
+/.claude/
+/docs/interview/
+/docs/fitplan/
+/docs/9.5.md
+/docs/services层.md
+/面试准备问题.md
+/_smart_tutor_私密/

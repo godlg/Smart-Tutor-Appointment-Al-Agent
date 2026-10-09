@@ -1,0 +1,102 @@
+{
+  "version": "1.0.0",
+  "description": "RAG 评估集: Recall@k 命中率 (复用 services.components.RecallAtKEvaluator / QueryCase 结构)",
+  "evaluator": "RecallAtKEvaluator",
+  "k": 3,
+  "corpus": [
+    {
+      "doc_id": 1,
+      "content": "高中数学 12 周提分方案：函数、几何、数列、概率四大模块系统讲，重点章节以高考真题为载体，包含一对一作业批改、错题梳理、阶段测试三个环节，目标是高考数学从平均分提升 20-30 分。",
+      "keywords": ["高中", "数学", "高考", "12周", "提分", "课程介绍"],
+      "category": "course_intro"
+    },
+    {
+      "doc_id": 2,
+      "content": "高三冲刺套餐：针对 6 月高考设计，1 月到 5 月完成三轮复习，包含考点串讲、模拟考刷题、心理疏导、报考志愿指导，适合数学、英语、理综等全学科。",
+      "keywords": ["高三", "冲刺", "高考", "复习", "套餐"],
+      "category": "course_intro"
+    },
+    {
+      "doc_id": 3,
+      "content": "小学阅读启蒙课：以绘本为载体，每节课讲解一本经典绘本 + 词汇 + 简单造句 + 复述故事，目标是让孩子爱上阅读，建立自主阅读习惯。",
+      "keywords": ["小学", "阅读", "绘本", "启蒙", "阅读习惯"],
+      "category": "course_intro"
+    },
+    {
+      "doc_id": 4,
+      "content": "数学思维训练方法：1. 重视概念定义 2. 一题多解 3. 错题本 4. 主动总结题型。小学阶段最忌讳死记硬背公式，应该让孩子理解公式背后的几何直观。",
+      "keywords": ["数学", "思维", "方法", "小学", "错题本"],
+      "category": "subject_method"
+    },
+    {
+      "doc_id": 5,
+      "content": "初中数学 一元二次方程 解题套路与错题梳理方法：重点讲解判别式、根与系数关系(韦达定理)、动点问题等高频考点，配中考真题训练。",
+      "keywords": ["初中", "数学", "一元二次方程", "韦达定理", "中考"],
+      "category": "subject_method"
+    },
+    {
+      "doc_id": 6,
+      "content": "如何帮孩子选择合适的家教老师：先看学科匹配（数学 / 物理 / 英语等），再看年级段（小学 / 初中 / 高中），最后考虑风格（严格 / 温和 / 启发式）和孩子的接受度。建议先安排一次 30 分钟试讲再决定。",
+      "keywords": ["家长", "选择", "老师", "试讲", "匹配"],
+      "category": "parent_guide"
+    }
+  ],
+  "cases": [
+    {
+      "id": "rag_001",
+      "version": "1.0.0",
+      "query": "高中数学 12 周提分方案包含哪些模块？",
+      "expected_doc_ids": [1],
+      "note": "明确答案: doc1"
+    },
+    {
+      "id": "rag_002",
+      "version": "1.0.0",
+      "query": "高三冲刺套餐是几月到几月完成复习？",
+      "expected_doc_ids": [2],
+      "note": "明确答案: doc2"
+    },
+    {
+      "id": "rag_003",
+      "version": "1.0.0",
+      "query": "小学阅读启蒙课用什么作为教学载体？",
+      "expected_doc_ids": [3],
+      "note": "明确答案: doc3"
+    },
+    {
+      "id": "rag_004",
+      "version": "1.0.0",
+      "query": "数学思维训练有哪些方法？",
+      "expected_doc_ids": [4],
+      "note": "明确答案: doc4"
+    },
+    {
+      "id": "rag_005",
+      "version": "1.0.0",
+      "query": "一元二次方程韦达定理怎么学？",
+      "expected_doc_ids": [5],
+      "note": "明确答案: doc5"
+    },
+    {
+      "id": "rag_006",
+      "version": "1.0.0",
+      "query": "怎么帮孩子选一位合适的家教老师？",
+      "expected_doc_ids": [6],
+      "note": "明确答案: doc6"
+    },
+    {
+      "id": "rag_007",
+      "version": "1.0.0",
+      "query": "高考数学如何提分",
+      "expected_doc_ids": [1, 2],
+      "note": "跨文档: 提分方案 + 高三冲刺套餐"
+    },
+    {
+      "id": "rag_008",
+      "version": "1.0.0",
+      "query": "小学孩子数学基础怎么打牢",
+      "expected_doc_ids": [4],
+      "note": "语义近义: 数学思维训练"
+    }
+  ]
+}

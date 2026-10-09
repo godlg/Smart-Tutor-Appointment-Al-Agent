@@ -1,0 +1,79 @@
+{
+  "version": "1.0.0",
+  "description": "交接评估集: 跨 Agent 完整对话路径, 验证 StateManager 状态机交接正确 (mock LLM 分类结果驱动)",
+  "driver": "mock 分类器返回每 turn 的 intent (字段 intents), 用真实 ClassificationProcessor + StateManager + 假 Agent 跑通路由/续轮/重置",
+  "expected_state_sequence_meaning": "每 turn 处理完后的状态 (不含初始 classify)",
+  "cases": [
+    {
+      "id": "handoff_001",
+      "version": "1.0.0",
+      "name": "试讲预约完整流",
+      "turns": [
+        "想约一节数学试讲",
+        "初二，明天晚上7点",
+        "就这个时间吧"
+      ],
+      "intents": ["trial", "trial", "trial"],
+      "expected_state_sequence": ["trial", "trial", "trial"],
+      "note": "分类→trial 态; 续轮 route_by_state 保持在 trial"
+    },
+    {
+      "id": "handoff_002",
+      "version": "1.0.0",
+      "name": "正式课预约多轮",
+      "turns": [
+        "帮我预约周六的物理课",
+        "好的，就下午3点"
+      ],
+      "intents": ["lesson", "lesson"],
+      "expected_state_sequence": ["lesson", "lesson"],
+      "note": "分类→lesson 态, 续轮保持"
+    },
+    {
+      "id": "handoff_003",
+      "version": "1.0.0",
+      "name": "咨询→试讲跨Agent交接",
+      "turns": [
+        "高中数学怎么提分？",
+        "那帮我约一节数学试讲"
+      ],
+      "intents": ["consultation", "trial"],
+      "expected_state_sequence": ["classify", "trial"],
+      "note": "咨询结束后状态机重置回 classify; 新一轮试讲→trial"
+    },
+    {
+      "id": "handoff_004",
+      "version": "1.0.0",
+      "name": "调课",
+      "turns": [
+        "周三的课想调到周五"
+      ],
+      "intents": ["reschedule"],
+      "expected_state_sequence": ["classify"],
+      "note": "调课走 LessonAgent change 分支, 处理完重置回 classify"
+    },
+    {
+      "id": "handoff_005",
+      "version": "1.0.0",
+      "name": "无关→咨询",
+      "turns": [
+        "今天天气怎么样？",
+        "数学学习方法有哪些？"
+      ],
+      "intents": ["unrelated", "consultation"],
+      "expected_state_sequence": ["classify", "classify"],
+      "note": "无关兜底保持 classify; 咨询后重置回 classify"
+    },
+    {
+      "id": "handoff_006",
+      "version": "1.0.0",
+      "name": "单轮咨询",
+      "turns": [
+        "小学阅读启蒙课是怎么上的？"
+      ],
+      "intents": ["consultation"],
+      "expected_state_sequence": ["classify"],
+      "note": "package/progress/consultation 归咨询流, 处理完重置"
+    }
+  ]
+}

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的系列课 - 家教智能预约</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+        }
+        .header {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 22px; }
+        .header-links a {
+            color: white; text-decoration: none;
+            margin-left: 12px; padding: 6px 14px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 6px; font-size: 14px;
+        }
+        .container { max-width: 1100px; margin: 24px auto; padding: 0 20px; }
+        .series-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .series-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .series-name { font-size: 20px; font-weight: 700; color: #2d3748; }
+        .series-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .status-active { background: #c6f6d5; color: #22543d; }
+        .status-paused { background: #feebc8; color: #7c2d12; }
+        .status-ended { background: #e2e8f0; color: #4a5568; }
+        .progress-section {
+            margin: 16px 0;
+        }
+        .progress-bar {
+            height: 12px;
+            background: #edf2f7;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fa709a 0%, #fee140 100%);
+        }
+        .series-meta {
+            display: flex;
+            gap: 24px;
+            color: #4a5568;
+            font-size: 14px;
+            flex-wrap: wrap;
+        }
+        .series-meta div { padding: 4px 0; }
+        .series-meta strong { color: #2d3748; }
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #fa709a; color: white; }
+        .btn-outline {
+            background: white;
+            border: 1px solid #e0e6ed;
+            color: #4a5568;
+        }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📚 我的系列课</h1>
+        <div class="header-links">
+            <a href="/">💬 智能助手</a>
+            <a href="/schedule-calendar">📅 排课日历</a>
+            <a href="/packages">📦 购买套餐</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="series-list"></div>
+    </div>
+
+    <script>
+        async function loadSeries() {
+            const list = document.getElementById('series-list');
+            try {
+                const res = await fetch('/api/lesson-series/');
+                const data = await res.json();
+                if (!data.data || data.data.length === 0) {
+                    list.innerHTML = `
+                        <div class="empty">
+                            <div style="font-size:48px;">📚</div>
+                            <div style="margin-top:12px;">暂无进行中的系列课</div>
+                            <a href="/packages" class="btn btn-primary" style="display:inline-block;margin-top:16px;text-decoration:none;">
+                                选购套餐开始学习
+                            </a>
+                        </div>
+                    `;
+                    return;
+                }
+                list.innerHTML = data.data.map(renderSeriesCard).join('');
+            } catch (e) {
+                list.innerHTML = `<div class="empty">加载失败：${e.message}</div>`;
+            }
+        }
+
+        function renderSeriesCard(s) {
+            const completed = s.completed_lessons || 0;
+            const cancelled = s.cancelled_lessons || 0;
+            const total = s.total_lessons || 0;
+            const remaining = total - completed - cancelled;
+            const pct = total > 0 ? Math.round(((completed + cancelled) / total) * 100) : 0;
+
+            const pattern = (s.weekly_pattern || []).map(p => {
+                const dayNames = ['周一','周二','周三','周四','周五','周六','周日'];
+                return `${dayNames[p.day_of_week]} ${p.time}`;
+            }).join('、');
+
+            return `
+                <div class="series-card">
+                    <div class="series-header">
+                        <div>
+                            <div class="series-name">系列课 #${s.id}</div>
+                            <div style="color:#718096;font-size:13px;margin-top:4px;">${s.start_date} ~ ${s.end_date}</div>
+                        </div>
+                        <div class="series-status status-${s.status}">
+                            ${({active:'进行中',paused:'已暂停',ended:'已结束'})[s.status] || s.status}
+                        </div>
+                    </div>
+
+                    <div class="progress-section">
+                        <div style="display:flex;justify-content:space-between;font-size:13px;color:#4a5568;">
+                            <span>进度：${completed + cancelled}/${total}</span>
+                            <span>剩余 ${remaining} 课时</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width:${pct}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="series-meta">
+                        <div><strong>周规律：</strong>${pattern || '暂无'}</div>
+                        <div><strong>已上：</strong>${completed}</div>
+                        <div><strong>取消：</strong>${cancelled}</div>
+                        <div><strong>套餐：</strong>${s.package_id ? '套餐 #' + s.package_id : '散单'}</div>
+                    </div>
+
+                    <div class="actions">
+                        <button class="btn btn-primary" onclick="viewDetail(${s.id})">查看详情</button>
+                        <button class="btn btn-outline" onclick="cancelSeries(${s.id})">取消系列</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function viewDetail(seriesId) {
+            try {
+                const res = await fetch(`/api/lesson-series/${seriesId}`);
+                const s = await res.json();
+                const upcoming = (s.lessons || [])
+                    .filter(l => l.status === 'confirmed' && new Date(l.scheduled_at) >= new Date())
+                    .slice(0, 5);
+                if (upcoming.length === 0) {
+                    alert('暂无即将到来的课时');
+                    return;
+                }
+                alert(
+                    `系列课 #${seriesId} 接下来 5 节课：\n\n` +
+                    upcoming.map(l => {
+                        const dt = new Date(l.scheduled_at);
+                        return `· ${dt.toLocaleString('zh-CN')} (${l.duration_minutes} 分钟)`;
+                    }).join('\n')
+                );
+            } catch (e) {
+                alert('查看失败：' + e.message);
+            }
+        }
+
+        async function cancelSeries(seriesId) {
+            if (!confirm(`确认取消系列课 #${seriesId} 吗？此操作将取消所有未上课程时。`)) return;
+            try {
+                const res = await fetch(`/api/lessons/series/${seriesId}/cancel`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({reason: '家长主动取消'}),
+                });
+                const data = await res.json();
+                alert(data.message);
+                loadSeries();
+            } catch (e) {
+                alert('取消失败：' + e.message);
+            }
+        }
+
+        loadSeries();
+    </script>
+</body>
+</html>

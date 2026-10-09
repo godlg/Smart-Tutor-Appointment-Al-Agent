@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习进度看板 - 家教智能预约</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+        }
+        .header {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 22px; }
+        .header-links a {
+            color: white; text-decoration: none;
+            margin-left: 12px; padding: 6px 14px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 6px; font-size: 14px;
+        }
+        .container { max-width: 1100px; margin: 24px auto; padding: 0 20px; }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2d3748;
+            margin: 4px 0;
+        }
+        .stat-label { color: #718096; font-size: 13px; }
+        .stat-card.blue .stat-value { color: #3182ce; }
+        .stat-card.green .stat-value { color: #38a169; }
+        .stat-card.orange .stat-value { color: #dd6b20; }
+        .stat-card.red .stat-value { color: #e53e3e; }
+
+        .section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 16px;
+        }
+        .section h3 {
+            color: #2d3748;
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+        .progress-card {
+            border-left: 4px solid #43e97b;
+            padding: 16px;
+            background: #f7fafc;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .progress-card.high { border-left-color: #38a169; }
+        .progress-card.medium { border-left-color: #dd6b20; }
+        .progress-card.low { border-left-color: #e53e3e; }
+
+        .progress-meta {
+            display: flex;
+            gap: 16px;
+            color: #718096;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        .mastery-bar {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .mastery-high { background: #c6f6d5; color: #22543d; }
+        .mastery-medium { background: #feebc8; color: #7c2d12; }
+        .mastery-low { background: #fed7d7; color: #742a2a; }
+        .weak-points {
+            margin-top: 8px;
+        }
+        .weak-point {
+            display: inline-block;
+            background: #fed7d7;
+            color: #742a2a;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .empty {
+            text-align: center;
+            color: #a0aec0;
+            padding: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📈 学习进度看板</h1>
+        <div class="header-links">
+            <a href="/">💬 智能助手</a>
+            <a href="/student-profile">👦 学生档案</a>
+            <a href="/parent-center">🏠 家长中心</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 概览统计 -->
+        <div class="stats-row">
+            <div class="stat-card blue">
+                <div class="stat-label">已上课时</div>
+                <div class="stat-value" id="stat-completed">--</div>
+            </div>
+            <div class="stat-card green">
+                <div class="stat-label">平均掌握度</div>
+                <div class="stat-value" id="stat-mastery">--</div>
+            </div>
+            <div class="stat-card orange">
+                <div class="stat-label">待上课时</div>
+                <div class="stat-value" id="stat-upcoming">--</div>
+            </div>
+            <div class="stat-card red">
+                <div class="stat-label">高频薄弱点</div>
+                <div class="stat-value" id="stat-weak">--</div>
+            </div>
+        </div>
+
+        <!-- 最近课程进度 -->
+        <div class="section">
+            <h3>📝 最近课程进度</h3>
+            <div id="progress-list"></div>
+        </div>
+
+        <!-- 薄弱点统计 -->
+        <div class="section">
+            <h3>⚠️ 薄弱点统计</h3>
+            <div id="weak-summary" class="empty">暂无数据</div>
+        </div>
+    </div>
+
+    <script>
+        const STUDENT_ID = 1;
+
+        async function loadDashboard() {
+            try {
+                const [progressRes, lessonsRes] = await Promise.all([
+                    fetch(`/api/progress/student/${STUDENT_ID}`),
+                    fetch(`/api/lessons/?student_id=${STUDENT_ID}`),
+                ]);
+                const progress = await progressRes.json();
+                const lessons = await lessonsRes.json();
+                renderStats(progress, lessons);
+                renderProgress(progress);
+                renderWeakPoints(progress);
+            } catch (e) {
+                document.getElementById('progress-list').innerHTML =
+                    `<div class="empty">加载失败：${e.message}</div>`;
+            }
+        }
+
+        function renderStats(progress, lessons) {
+            const completedLessons = lessons.filter(l => l.status === 'completed').length;
+            const upcomingLessons = lessons.filter(l =>
+                l.status === 'confirmed' && new Date(l.scheduled_at) >= new Date()
+            ).length;
+
+            document.getElementById('stat-completed').textContent = completedLessons;
+            document.getElementById('stat-upcoming').textContent = upcomingLessons;
+
+            if (progress.length > 0) {
+                const avg = progress.reduce((sum, p) => sum + (p.mastery_score || 0), 0) / progress.length;
+                document.getElementById('stat-mastery').textContent = avg.toFixed(1);
+            } else {
+                document.getElementById('stat-mastery').textContent = '--';
+            }
+
+            // 薄弱点统计
+            const weakCount = {};
+            progress.forEach(p => {
+                (p.weak_points || []).forEach(w => {
+                    weakCount[w] = (weakCount[w] || 0) + 1;
+                });
+            });
+            const sortedWeak = Object.entries(weakCount).sort((a, b) => b[1] - a[1]);
+            if (sortedWeak.length > 0) {
+                document.getElementById('stat-weak').textContent = sortedWeak[0][0];
+            } else {
+                document.getElementById('stat-weak').textContent = '--';
+            }
+        }
+
+        function renderProgress(progress) {
+            const list = document.getElementById('progress-list');
+            if (progress.length === 0) {
+                list.innerHTML = '<div class="empty">暂无进度记录，完成一节课后会显示在这里</div>';
+                return;
+            }
+            list.innerHTML = progress.slice(0, 10).map(p => {
+                const mastery = p.mastery_score || 0;
+                const level = mastery >= 8 ? 'high' : mastery >= 6 ? 'medium' : 'low';
+                const label = mastery >= 8 ? '优秀' : mastery >= 6 ? '一般' : '需加强';
+                const created = p.created_at ? new Date(p.created_at).toLocaleDateString('zh-CN') : '';
+                return `
+                    <div class="progress-card ${level}">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <strong>${p.content_covered || '课堂内容'}</strong>
+                            <span class="mastery-bar mastery-${level}">${mastery.toFixed(1)} · ${label}</span>
+                        </div>
+                        <div style="color:#4a5568;font-size:14px;margin-top:6px;">
+                            ${p.homework ? '📋 作业：' + p.homework : ''}
+                        </div>
+                        ${(p.weak_points || []).length > 0 ? `
+                            <div class="weak-points">
+                                <span style="color:#718096;font-size:12px;">薄弱点：</span>
+                                ${p.weak_points.map(w => `<span class="weak-point">${w}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                        <div class="progress-meta">
+                            ${created ? `<span>📅 ${created}</span>` : ''}
+                            ${p.ai_summary ? `<span>🤖 ${p.ai_summary.slice(0, 50)}...</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderWeakPoints(progress) {
+            const summary = document.getElementById('weak-summary');
+            const weakCount = {};
+            progress.forEach(p => {
+                (p.weak_points || []).forEach(w => {
+                    weakCount[w] = (weakCount[w] || 0) + 1;
+                });
+            });
+            const sortedWeak = Object.entries(weakCount).sort((a, b) => b[1] - a[1]);
+            if (sortedWeak.length === 0) {
+                summary.classList.add('empty');
+                summary.textContent = '暂无数据';
+                return;
+            }
+            summary.classList.remove('empty');
+            summary.style.textAlign = 'left';
+            summary.innerHTML = sortedWeak.map(([point, count]) => `
+                <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#f7fafc;border-radius:6px;margin-bottom:8px;">
+                    <span style="color:#742a2a;font-weight:600;">${point}</span>
+                    <span style="color:#a0aec0;">出现 ${count} 次</span>
+                </div>
+            `).join('');
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>

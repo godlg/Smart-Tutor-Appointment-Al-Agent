@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>老师详情 - 家教智能预约</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+        }
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 22px; }
+        .header-links a {
+            color: white; text-decoration: none;
+            margin-left: 12px; padding: 6px 14px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 6px; font-size: 14px;
+        }
+        .container {
+            max-width: 960px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+        .teacher-card {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 24px;
+        }
+        .teacher-avatar {
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 48px;
+            font-weight: 600;
+        }
+        .teacher-info h2 {
+            font-size: 28px;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+        .teacher-meta {
+            color: #718096;
+            font-size: 14px;
+            margin: 8px 0 16px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin: 16px 0;
+            padding: 16px;
+            background: #f7fafc;
+            border-radius: 10px;
+        }
+        .info-item .label {
+            font-size: 12px;
+            color: #a0aec0;
+            margin-bottom: 4px;
+        }
+        .info-item .value {
+            font-size: 16px;
+            color: #2d3748;
+            font-weight: 600;
+        }
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 12px 0;
+        }
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #e6f3ff;
+            color: #2c5282;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+        .bio {
+            background: #f7fafc;
+            padding: 16px;
+            border-radius: 10px;
+            color: #4a5568;
+            line-height: 1.7;
+            margin: 16px 0;
+        }
+        .availability-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            margin-top: 24px;
+        }
+        .availability-section h3 {
+            margin-bottom: 16px;
+            color: #2d3748;
+        }
+        .avail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+        .avail-day {
+            background: #f7fafc;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        .avail-day .day {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 6px;
+        }
+        .avail-slot {
+            display: inline-block;
+            background: #e6f3ff;
+            color: #2c5282;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .cta-bar {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .cta-bar .price {
+            font-size: 32px;
+            font-weight: 700;
+            color: #e53e3e;
+        }
+        .cta-bar .price small {
+            font-size: 14px;
+            color: #718096;
+            font-weight: 400;
+        }
+        .btn-trial {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 14px 32px;
+            border-radius: 10px;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-trial:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(79,172,254,0.3); }
+        .btn-trial:disabled {
+            opacity: 0.5; cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>👨‍🏫 老师详情</h1>
+        <div class="header-links">
+            <a href="/">💬 智能助手</a>
+            <a href="/teachers">← 返回老师库</a>
+            <a href="/packages">📦 套餐</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="teacher-card" id="teacher-card">
+            <div class="teacher-avatar" id="avatar">👨‍🏫</div>
+            <div class="teacher-info">
+                <h2 id="teacher-name">加载中...</h2>
+                <div class="teacher-meta" id="teacher-meta"></div>
+                <div class="tags" id="subject-tags"></div>
+                <div class="bio" id="teacher-bio"></div>
+            </div>
+        </div>
+
+        <div class="availability-section">
+            <h3>📅 可约时段</h3>
+            <div class="avail-grid" id="availability-grid">
+                <div style="color:#a0aec0;">加载中...</div>
+            </div>
+        </div>
+
+        <div class="cta-bar">
+            <div>
+                <div class="price">
+                    ¥<span id="teacher-rate">--</span>
+                    <small>/小时</small>
+                </div>
+                <div style="color:#718096;font-size:14px;margin-top:4px;">
+                    ⭐ <span id="teacher-rating">--</span> 分 ·
+                    <span id="teacher-exp">--</span> 年经验
+                </div>
+            </div>
+            <button class="btn-trial" id="book-trial-btn" onclick="bookTrial()">
+                📅 预约免费试讲
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const teacherId = urlParams.get('id');
+
+        if (!teacherId) {
+            alert('缺少老师 ID');
+            window.location.href = '/teachers';
+        }
+
+        async function loadTeacher() {
+            try {
+                const res = await fetch(`/api/teachers/${teacherId}`);
+                if (!res.ok) throw new Error('老师不存在');
+                const t = await res.json();
+                renderTeacher(t);
+            } catch (e) {
+                document.getElementById('teacher-name').textContent = '加载失败：' + e.message;
+            }
+        }
+
+        function renderTeacher(t) {
+            document.title = `${t.name} - 老师详情`;
+            document.getElementById('teacher-name').textContent = `${t.name}（${t.gender || '未知'}）`;
+            document.getElementById('teacher-meta').textContent =
+                `${t.teaching_style || ''} · ${t.education_bg || ''}`;
+            document.getElementById('teacher-bio').textContent = t.bio || '暂无简介';
+            document.getElementById('teacher-rate').textContent = t.hourly_rate;
+            document.getElementById('teacher-rating').textContent = t.rating;
+            document.getElementById('teacher-exp').textContent = t.years_experience;
+            document.getElementById('avatar').textContent = t.name[0];
+
+            const tagsEl = document.getElementById('subject-tags');
+            const allTags = [
+                ...(t.subjects || []).map(s => ({type: 'subject', text: s})),
+                ...(t.grade_levels || []).map(g => ({type: 'grade', text: g})),
+                ...(t.highlights || []).slice(0, 3).map(h => ({type: 'highlight', text: h})),
+            ];
+            tagsEl.innerHTML = allTags.map(t =>
+                `<span class="tag" style="
+                    ${t.type === 'subject' ? 'background:#e6f3ff;color:#2c5282;' : ''}
+                    ${t.type === 'grade' ? 'background:#fef3e2;color:#c05621;' : ''}
+                    ${t.type === 'highlight' ? 'background:#f0fff4;color:#22543d;' : ''}
+                ">${t.text}</span>`
+            ).join('');
+
+            // 可用时段
+            const availEl = document.getElementById('availability-grid');
+            const weekdayMap = {
+                monday: '周一', tuesday: '周二', wednesday: '周三',
+                thursday: '周四', friday: '周五', saturday: '周六', sunday: '周日',
+            };
+            const availList = (t.availability || []).map(a => ({
+                day: weekdayMap[a.day] || a.day,
+                slots: a.slots,
+            }));
+            if (availList.length === 0) {
+                availEl.innerHTML = '<div style="color:#a0aec0;">老师暂未公布可约时段，请联系顾问</div>';
+            } else {
+                availEl.innerHTML = availList.map(a => `
+                    <div class="avail-day">
+                        <div class="day">${a.day}</div>
+                        ${a.slots.map(s => `<span class="avail-slot">${s}</span>`).join('')}
+                    </div>
+                `).join('');
+            }
+
+            if (!t.trial_available) {
+                document.getElementById('book-trial-btn').disabled = true;
+                document.getElementById('book-trial-btn').textContent = '该老师暂不提供试讲';
+            }
+        }
+
+        function bookTrial() {
+            const message = `我想预约 ${document.getElementById('teacher-name').textContent} 老师的试讲`;
+            window.location.href = `/?message=${encodeURIComponent(message)}`;
+        }
+
+        loadTeacher();
+    </script>
+</body>
+</html>

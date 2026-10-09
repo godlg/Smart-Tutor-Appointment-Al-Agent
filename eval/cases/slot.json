@@ -1,0 +1,137 @@
+{
+  "version": "1.0.0",
+  "description": "槽位评估集: TrialInputParser 字段提取正确性 (subject/grade_level/start_time/duration/teacher 等)",
+  "parser": "TrialInputParser",
+  "expected_fields": [
+    "subject",
+    "grade_level",
+    "start_time",
+    "duration_minutes",
+    "preferred_teacher_name",
+    "preferred_style",
+    "info_complete"
+  ],
+  "cases": [
+    {
+      "id": "slot_001",
+      "version": "1.0.0",
+      "utterance": "想约明天晚上7点的数学试讲，孩子初二",
+      "expected": {
+        "subject": "数学",
+        "grade_level": "初中",
+        "start_time": "2026-09-24 19:00",
+        "duration_minutes": "30",
+        "info_complete": true
+      },
+      "note": "完整信息: 学科+年级+时间"
+    },
+    {
+      "id": "slot_002",
+      "version": "1.0.0",
+      "utterance": "给孩子约一节试听课",
+      "expected": {
+        "subject": "未知",
+        "grade_level": "未知",
+        "start_time": "未知",
+        "info_complete": false
+      },
+      "note": "缺失字段: 全部未知, 时间默认今天"
+    },
+    {
+      "id": "slot_003",
+      "version": "1.0.0",
+      "utterance": "英语试讲，周六下午3点，时长45分钟",
+      "expected": {
+        "subject": "英语",
+        "grade_level": "未知",
+        "start_time": "2026-09-26 15:00",
+        "duration_minutes": "45",
+        "info_complete": false
+      },
+      "note": "口语变体: 时长显式给出 (周六=本周六 2026-09-26)"
+    },
+    {
+      "id": "slot_004",
+      "version": "1.0.0",
+      "utterance": "想跟张明老师约一次物理试讲",
+      "expected": {
+        "subject": "物理",
+        "grade_level": "未知",
+        "preferred_teacher_name": "张明",
+        "info_complete": false
+      },
+      "note": "指定老师姓名"
+    },
+    {
+      "id": "slot_005",
+      "version": "1.0.0",
+      "utterance": "老师要求严格一点的，化学课，孩子初三",
+      "expected": {
+        "subject": "化学",
+        "grade_level": "初中",
+        "preferred_style": "严格",
+        "info_complete": false
+      },
+      "note": "风格偏好 + 年级口语('初三'=初中)"
+    },
+    {
+      "id": "slot_006",
+      "version": "1.0.0",
+      "utterance": "周五晚上试讲",
+      "expected": {
+        "subject": "未知",
+        "grade_level": "未知",
+        "start_time": "未知",
+        "info_complete": false
+      },
+      "note": "相对时间换算: 周五晚上=本周五 19:00"
+    },
+    {
+      "id": "slot_007",
+      "version": "1.0.0",
+      "utterance": "数学和英语都行，时间老师定",
+      "expected": {
+        "subject": "未知",
+        "grade_level": "未知",
+        "start_time": "未知",
+        "info_complete": false
+      },
+      "note": "冲突/模糊: 多学科取首个, 时间未定默认今天"
+    },
+    {
+      "id": "slot_008",
+      "version": "1.0.0",
+      "utterance": "孩子小学四年级，想试听语文绘本课",
+      "expected": {
+        "subject": "语文",
+        "grade_level": "小学高年级",
+        "info_complete": false
+      },
+      "note": "年级口语变体: 小学四年级=小学低年级"
+    },
+    {
+      "id": "slot_009",
+      "version": "1.0.0",
+      "utterance": "试讲一小时可以吗",
+      "expected": {
+        "subject": "未知",
+        "grade_level": "未知",
+        "duration_minutes": "60",
+        "info_complete": false
+      },
+      "note": "时长口语: 一小时=60 分钟"
+    },
+    {
+      "id": "slot_010",
+      "version": "1.0.0",
+      "utterance": "明天上午10点，高中数学，孩子高二",
+      "expected": {
+        "subject": "数学",
+        "grade_level": "高中",
+        "start_time": "2026-09-24 10:00",
+        "info_complete": true
+      },
+      "note": "完整信息另一变体"
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>老师库 - 家教智能预约</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 28px; }
+        .header-links a {
+            color: white; text-decoration: none;
+            margin-left: 16px; padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+        }
+        .filter-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-bar select, .filter-bar button {
+            padding: 10px 16px;
+            border: 1px solid #e0e6ed;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .filter-bar button {
+            background: #4facfe;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .teacher-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        .teacher-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .teacher-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        .teacher-name {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+        .teacher-tags {
+            margin: 10px 0;
+        }
+        .tag {
+            display: inline-block;
+            background: #e6f3ff;
+            color: #2c5282;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 6px;
+        }
+        .teacher-bio {
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 12px 0;
+        }
+        .teacher-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #edf2f7;
+        }
+        .teacher-rate {
+            color: #e53e3e;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        .btn-trial {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>👨‍🏫 老师库</h1>
+        <div class="header-links">
+            <a href="/">💬 智能助手</a>
+            <a href="/packages">📦 套餐</a>
+            <a href="/teachers">🔄 全部老师</a>
+        </div>
+    </div>
+
+    <div class="filter-bar">
+        <label>学科：</label>
+        <select id="subject-filter">
+            <option value="">全部</option>
+            {% for s in subjects %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+        </select>
+        <label>年级：</label>
+        <select id="grade-filter">
+            <option value="">全部</option>
+            {% for g in grade_levels %}
+            <option value="{{ g }}">{{ g }}</option>
+            {% endfor %}
+        </select>
+        <button onclick="filterTeachers()">筛选</button>
+        <button onclick="resetFilter()" style="background:#e2e8f0;color:#4a5568;">重置</button>
+    </div>
+
+    <div class="teacher-grid" id="teacher-grid">
+        {% for t in teachers %}
+        <div class="teacher-card"
+             data-subjects="{{ t.subjects|join(',') }}"
+             data-grades="{{ t.grade_levels|join(',') }}">
+            <div class="teacher-name">
+                {{ t.name }}
+                <span style="font-size:14px;color:#a0aec0;">（{{ t.gender or '未知' }}）</span>
+            </div>
+            <div style="color:#718096;font-size:13px;">
+                {{ t.teaching_style }} · {{ t.years_experience }} 年经验 · 评分 {{ t.rating }}
+            </div>
+            <div class="teacher-tags">
+                {% for s in t.subjects %}<span class="tag">{{ s }}</span>{% endfor %}
+                {% for g in t.grade_levels %}<span class="tag" style="background:#fef3e2;color:#c05621;">{{ g }}</span>{% endfor %}
+            </div>
+            <div class="teacher-bio">{{ t.bio }}</div>
+            <div class="teacher-meta">
+                <span class="teacher-rate">¥{{ t.hourly_rate }}/小时</span>
+                <button class="btn-trial" onclick="bookTrial({{ t.id }}, '{{ t.name }}')">📅 预约试讲</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        function filterTeachers() {
+            const subject = document.getElementById('subject-filter').value;
+            const grade = document.getElementById('grade-filter').value;
+            const cards = document.querySelectorAll('.teacher-card');
+            cards.forEach(card => {
+                const subjects = card.dataset.subjects.split(',');
+                const grades = card.dataset.grades.split(',');
+                const matchSub = !subject || subjects.includes(subject);
+                const matchGrade = !grade || grades.includes(grade);
+                card.style.display = (matchSub && matchGrade) ? 'block' : 'none';
+            });
+        }
+        function resetFilter() {
+            document.getElementById('subject-filter').value = '';
+            document.getElementById('grade-filter').value = '';
+            filterTeachers();
+        }
+        function bookTrial(teacherId, teacherName) {
+            const message = `我想预约 ${teacherName} 老师的试讲`;
+            window.location.href = `/?message=${encodeURIComponent(message)}`;
+        }
+    </script>
+</body>
+</html>

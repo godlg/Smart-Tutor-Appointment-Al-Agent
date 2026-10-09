@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>课时套餐 - 家教智能预约</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 28px; }
+        .header-links a {
+            color: white; text-decoration: none;
+            margin-left: 16px; padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+        }
+        .package-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 24px;
+        }
+        .package-card {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+            transition: transform 0.2s;
+        }
+        .package-card:hover { transform: translateY(-4px); }
+        .package-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+        .package-tags {
+            display: flex;
+            gap: 8px;
+            margin: 12px 0;
+        }
+        .package-tag {
+            background: #fff5e6;
+            color: #c05621;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+        .package-price {
+            color: #e53e3e;
+            font-size: 32px;
+            font-weight: 700;
+            margin: 16px 0;
+        }
+        .package-detail {
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1.8;
+            margin-bottom: 16px;
+        }
+        .package-schedule {
+            background: #f7fafc;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #4a5568;
+            margin-bottom: 16px;
+        }
+        .btn-buy {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📦 课时套餐</h1>
+        <div class="header-links">
+            <a href="/">💬 智能助手</a>
+            <a href="/teachers">👨‍🏫 老师库</a>
+        </div>
+    </div>
+
+    <div class="package-grid">
+        {% for p in packages %}
+        <div class="package-card">
+            <div class="package-name">{{ p.name }}</div>
+            <div class="package-tags">
+                {% if p.subject %}<span class="package-tag">{{ p.subject }}</span>{% endif %}
+                {% if p.grade_level %}<span class="package-tag">{{ p.grade_level }}</span>{% endif %}
+            </div>
+            <div class="package-price">¥{{ p.price_total }}</div>
+            <div class="package-detail">
+                共 <strong>{{ p.total_lessons }}</strong> 课时 ·
+                单次 <strong>{{ p.duration_minutes }}</strong> 分钟 ·
+                <strong>¥{{ "%.0f"|format(p.price_per_lesson) }}</strong>/课时
+                <br>
+                有效期：{{ p.validity_days }} 天
+            </div>
+            {% if p.weekly_schedule %}
+            <div class="package-schedule">
+                📅 <strong>固定时段：</strong>
+                {% for s in p.weekly_schedule %}
+                    周{{ ["一","二","三","四","五","六","日"][s.day_of_week] }} {{ s.start_time }}
+                    {% if not loop.last %} · {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <p style="color:#718096;font-size:13px;margin-bottom:16px;">{{ p.description }}</p>
+            <button class="btn-buy" onclick="purchase({{ p.id }})">立即购买</button>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        // 当前学员 id: 优先从 URL ?student_id= 取,否则用 localStorage,最后回退 1。
+        // 注意: 仍需在 purchase 失败时明确告诉家长原因(避免黑盒)。
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentStudentId = Number(
+            urlParams.get('student_id')
+            || localStorage.getItem('smart_tutor_student_id')
+            || 1
+        );
+
+        async function purchase(packageId) {
+            if (!confirm('确认购买？MVP 阶段为 Mock，不会真实扣款。')) return;
+            try {
+                const res = await fetch(
+                    `/api/packages/${packageId}/purchase?student_id=${currentStudentId}`,
+                    { method: 'POST' }
+                );
+                const data = await res.json();
+                if (data.success) {
+                    // 记住当前学员 id 给后续页面用
+                    localStorage.setItem('smart_tutor_student_id', String(data.student_id));
+                    alert(
+                        '✅ 购买成功！\n\n' +
+                        `套餐 ID: ${data.package_id}\n` +
+                        `金额: ¥${data.amount}\n\n` +
+                        '已为您创建系列课入口，点击确定进入「我的系列课」开始排课。'
+                    );
+                    window.location.href = '/lesson-series';
+                } else {
+                    alert('购买失败：' + (data.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('网络错误：' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
