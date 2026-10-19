@@ -8,7 +8,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)
 ![Orchestration](https://img.shields.io/badge/Orchestration-LangGraph%20%7C%20LangChain-1C3C3C)
-![Tests](https://img.shields.io/badge/tests-1600%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1621%20passed-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 </div>
@@ -21,7 +21,7 @@
 
 本项目把这条链路做成一个可运行的多 Agent 系统：家长用自然语言提问，系统先识别意图，再把任务分发给对应的专业 Agent，完成老师匹配、试讲预约与转化、正式课/系列课排课与调课退课、RAG 知识问答、学习进度与流失预警，并在 AI 处理不了时把会话交给人工。
 
-技术栈 FastAPI + LangChain/LangGraph + SQLAlchemy(SQLite) + FAISS，五层单向依赖架构，27 张表 / 72 条路由 / 10 类意图 / 1600 条测试全绿。
+技术栈 FastAPI + LangChain/LangGraph + SQLAlchemy(SQLite) + FAISS，五层单向依赖架构，28 张表 / 76 条路由 / 10 类意图 / 1621 条测试全绿。
 
 ## 核心能力
 
@@ -71,7 +71,7 @@
 | `/console/human-handoff` | 人工接管队列（客服 claim / 回复；需 `support` 或 `admin`） |
 | `/console/knowledge` | 学科知识库管理（需 `academic` 或 `admin`） |
 | `/console/user_behavior_analysis` | 学员行为分析看板（需 `academic` 或 `admin`） |
-| `/teacher/login` · `/teacher` | 老师端：本老师待办、确认 / 拒绝档期（需老师账号） |
+| `/teacher/login` · `/teacher` | 老师端：本老师待办、确认 / 拒绝档期与调课请求（需老师账号） |
 
 ## 系统架构
 
@@ -80,13 +80,13 @@
 ```text
 Web & Application   app.py, web/          页面、路由入口、启动与调度
         ↓
-API                 api/                  72 条路由、请求编排、统一响应封装
+API                 api/                  76 条路由、请求编排、统一响应封装
         ↓
 Agents              agents/               意图识别、多 Agent 流程、LangGraph 图
         ↓
 Services            services/             推荐、排课、检索、记忆、人工接管
         ↓
-DB                  db/                   27 张表的 SQLAlchemy 模型 + Repository
+DB                  db/                   28 张表的 SQLAlchemy 模型 + Repository
 ```
 
 | Agent | 职责 |
@@ -183,16 +183,16 @@ python scripts/demo_query_transform.py           # query 变换：off / rule / l
 ## 测试与评估
 
 ```bash
-pytest tests/ -q                     # 1600 passed（2026-10-19 实测）
+pytest tests/ -q                     # 1621 passed（2026-10-19 实测）
 python -m eval.runner                # EDD 冻结用例 + 发布门禁
 ```
 
 | 指标 | 实测值 |
 | --- | --- |
-| 单元 / 集成测试 | 1600 passed（80 个测试文件） |
+| 单元 / 集成测试 | 1621 passed（81 个测试文件） |
 | 冻结评估用例 | 67 条（routing 12 / rag 24 / slot 10 / tool 7 / handoff 6 / safety 8） |
 | 发布门禁 | 10 项阈值全过（`eval/gates.py` 读 `config/evals.yaml`；`--only` 子集模式输出 PARTIAL 且只校验已跑类别） |
-| 数据表 / API 路由 / 意图类别 | 27 / 72 / 10 |
+| 数据表 / API 路由 / 意图类别 | 28 / 76 / 10 |
 
 ## 项目结构
 
@@ -200,13 +200,13 @@ python -m eval.runner                # EDD 冻结用例 + 发布门禁
 ├── agents/          # 主控 + 4 业务 Agent + LangGraph 图 + Agentic 工具循环
 ├── api/             # API 编排层（16 个 router + core 响应封装）
 ├── services/        # 业务逻辑：推荐 / 排课 / 知识库 / 混合检索 / query 变换 / 记忆 / 人工接管
-├── db/              # SQLAlchemy 模型 + Repository（27 张表）
+├── db/              # SQLAlchemy 模型 + Repository（28 张表）
 ├── observability/   # 结构化日志、X-Request-ID、span 追踪、Prometheus 指标
 ├── eval/            # EDD 评估器、冻结用例、发布门禁
 ├── config/          # 设置、模型 Provider 工厂、时间语义、组件工厂、门禁阈值
 ├── web/             # Web 页面与模板（16 个页面）
 ├── scripts/         # 演示、重建 embedding、下载精排模型等工具脚本
-├── tests/           # 1600 条测试
+├── tests/           # 1621 条测试
 ├── app.py           # 应用入口（路由注册、初始化、调度器）
 └── requirements.txt
 ```

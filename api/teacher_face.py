@@ -18,6 +18,7 @@ from typing import Any, Dict, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from services.lesson_change_service import LessonChangeError, LessonChangeService
 from services.lesson_service import LessonService
 
 from .core.console_auth import require_teacher
@@ -146,3 +147,50 @@ def reject_lesson(
         },
     )
     return {"lesson_id": lesson_id, "status": "cancelled", "reason": body.reason}
+
+
+# ============================================
+# 调课请求确认（C2a）：teacher_id 只来自会话，归属不符 404
+# ============================================
+
+def get_change_service():
+    """调课请求服务工厂(生成器依赖,请求结束关闭连接);测试通过 monkeypatch services.lesson_change_service.DEFAULT_DB_PATH 指向临时库。"""
+    service = LessonChangeService()
+    try:
+        yield service
+    finally:
+        service.close()
+
+
+@router.get("/change-requests", summary="本老师名下的调课请求")
+def list_change_requests(
+    status: Literal["pending", "approved", "rejected"] = "pending",
+    teacher: dict = Depends(_require_teacher),
+    service: LessonChangeService = Depends(get_change_service),
+):
+    return service.list_for_teacher(teacher["teacher_id"], status=status)
+
+
+@router.post("/change-requests/{request_id}/approve", summary="确认调课请求（应用改期）")
+def approve_change_request(
+    request_id: int,
+    teacher: dict = Depends(_require_teacher),
+    service: LessonChangeService = Depends(get_change_service),
+):
+    try:
+        return service.approve(request_id, teacher["teacher_id"])
+    except LessonChangeError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/change-requests/{request_id}/reject", summary="拒绝调课请求（课时时间不动）")
+def reject_change_request(
+    request_id: int,
+    body: RejectRequest,
+    teacher: dict = Depends(_require_teacher),
+    service: LessonChangeService = Depends(get_change_service),
+):
+    try:
+        return service.reject(request_id, teacher["teacher_id"], reason=body.reason)
+    except LessonChangeError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)

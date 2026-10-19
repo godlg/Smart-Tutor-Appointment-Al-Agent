@@ -82,6 +82,7 @@
         button.reject { background: var(--danger); }
         button:disabled { opacity: 0.5; cursor: default; }
         .empty { padding: 28px 18px; text-align: center; color: var(--muted); font-size: 14px; }
+        .section-title { max-width: 960px; margin: 32px auto 12px; font-size: 16px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -101,9 +102,24 @@
         </div>
     </section>
 
+    <h2 class="section-title">待确认调课</h2>
+    <p class="error" id="change-error-box" role="alert"></p>
+
+    <section class="list" id="change-list" aria-live="polite">
+        <div class="row head">
+            <div>原时间 → 新时间</div>
+            <div>学科 / 学生</div>
+            <div>方式 / 发起时间</div>
+            <div>操作</div>
+        </div>
+    </section>
+
     <script>
         const errorBox = document.getElementById('error-box');
         const lessonList = document.getElementById('lesson-list');
+        const changeErrorBox = document.getElementById('change-error-box');
+        const changeList = document.getElementById('change-list');
+        const CHANGE_MODE_LABELS = { only_this: '仅这一次', this_and_following: '本次及之后' };
 
         function showError(text) {
             errorBox.textContent = text;
@@ -217,6 +233,89 @@
             }
         }
 
+        function showChangeError(text) {
+            changeErrorBox.textContent = text;
+            changeErrorBox.classList.add('visible');
+        }
+
+        function clearChangeError() {
+            changeErrorBox.classList.remove('visible');
+        }
+
+        function reportChangeError(err) {
+            if (err.message !== '未登录') showChangeError(err.message);
+        }
+
+        function buildChangeHeader() {
+            const head = document.createElement('div');
+            head.className = 'row head';
+            ['原时间 → 新时间', '学科 / 学生', '方式 / 发起时间', '操作'].forEach((label) => head.appendChild(buildCell(label)));
+            return head;
+        }
+
+        function buildChangeRow(item) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            const lesson = item.lesson || {};
+            row.appendChild(buildCell(`${formatTime(item.old_scheduled_at)} → ${formatTime(item.new_scheduled_at)}`));
+            row.appendChild(buildCell(`${lesson.subject || '—'} / 学生 #${lesson.student_id || '—'}`));
+            row.appendChild(buildCell(`${CHANGE_MODE_LABELS[item.mode] || item.mode} · ${formatTime(item.created_at)}`));
+
+            const actions = document.createElement('div');
+            actions.className = 'actions';
+            const acceptBtn = document.createElement('button');
+            acceptBtn.type = 'button';
+            acceptBtn.textContent = '同意';
+            const rejectBtn = document.createElement('button');
+            rejectBtn.type = 'button';
+            rejectBtn.className = 'reject';
+            rejectBtn.textContent = '拒绝';
+
+            acceptBtn.onclick = () => decideChange(item.id, 'approve', null, row);
+            rejectBtn.onclick = () => {
+                const reason = prompt('拒绝原因（可留空）', '');
+                if (reason === null) return; // 老师取消输入 → 不发起拒绝
+                decideChange(item.id, 'reject', reason, row);
+            };
+
+            actions.append(acceptBtn, rejectBtn);
+            row.appendChild(actions);
+            return row;
+        }
+
+        function renderChanges(items) {
+            changeList.replaceChildren(buildChangeHeader());
+            if (items.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'empty';
+                empty.textContent = '暂无待确认调课';
+                changeList.appendChild(empty);
+                return;
+            }
+            items.forEach((item) => changeList.appendChild(buildChangeRow(item)));
+        }
+
+        async function loadChangeRequests() {
+            const body = await requestJson('/api/teacher/change-requests?status=pending');
+            renderChanges(body);
+        }
+
+        async function decideChange(requestId, action, reason, rowElement) {
+            clearChangeError();
+            rowElement.querySelectorAll('button').forEach((btn) => { btn.disabled = true; });
+            try {
+                const init = { method: 'POST', headers: {} };
+                if (action === 'reject') {
+                    init.headers['Content-Type'] = 'application/json';
+                    init.body = JSON.stringify({ reason: reason || null });
+                }
+                await requestJson(`/api/teacher/change-requests/${requestId}/${action}`, init);
+            } catch (err) {
+                reportChangeError(err); // 409 等失败：把后端 detail 显示给老师
+            }
+            await loadChangeRequests().catch(reportChangeError);
+        }
+
         async function init() {
             try {
                 const me = await requestJson('/api/teacher/me');
@@ -226,6 +325,7 @@
             } catch (err) {
                 if (err.message !== '未登录') showError(err.message);
             }
+            await loadChangeRequests().catch(reportChangeError);
         }
 
         init();

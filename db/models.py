@@ -598,3 +598,25 @@ class ConsoleSession(Base):
     role = Column(String(32), nullable=False)             # 签发时快照,避免角色变更后旧会话静默提权
     created_at = Column(DateTime, default=datetime.now)
     expires_at = Column(DateTime, nullable=False)
+
+
+class LessonChangeRequest(Base):
+    """调课请求(C2a:调课需老师确认)。
+
+    同一课时同时只允许一个 pending 请求,由 services/lesson_change_service.py 保证,
+    不在这里加 UniqueConstraint(否则会连带限制多条 approved 历史)。
+    """
+    __tablename__ = 'lesson_change_requests'
+
+    id = Column(Integer, primary_key=True)
+    lesson_id = Column(Integer, ForeignKey('lessons.id'), nullable=False, index=True)
+    series_id = Column(Integer, ForeignKey('lesson_series.id'), nullable=True)
+    requested_by = Column(String(64), nullable=False, default='parent')   # 发起方标识(未鉴权)
+    mode = Column(String(16), nullable=False, default='only_this')        # only_this | this_and_following
+    old_scheduled_at = Column(DateTime, nullable=False)                   # 发起时的课时时间快照
+    new_scheduled_at = Column(DateTime, nullable=False)
+    status = Column(String(16), nullable=False, default='pending', index=True)  # pending|approved|rejected
+    reason = Column(Text, nullable=True)                                  # 拒绝原因 / 备注
+    decided_by_teacher_id = Column(Integer, ForeignKey('teachers.id'), nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+    decided_at = Column(DateTime, nullable=True)

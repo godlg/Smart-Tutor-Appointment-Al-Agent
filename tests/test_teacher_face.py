@@ -484,3 +484,21 @@ class TestUnauthenticatedApi:
         face_env.cookies.clear()
         r = face_env.request(method, path, json={"reason": "x"})
         assert r.status_code == 401, r.text
+
+
+# ----------------------------------------------------------------------
+# 10. 老师端「待确认调课」区块接线（页面级）
+# ----------------------------------------------------------------------
+
+class TestTeacherChangeRequestBlock:
+
+    def test_teacher_home_wires_change_request_block_and_requires_login(self, face_env):
+        """老师页 HTML 含「待确认调课」区块与其接口路径；未登录仍 401（回归）。"""
+        _login_teacher(face_env, 1)
+        r = face_env.get("/teacher")
+        assert r.status_code == 200, r.text
+        assert "待确认调课" in r.text
+        assert "/api/teacher/change-requests" in r.text
+
+        face_env.cookies.clear()
+        assert face_env.get("/teacher").status_code == 401

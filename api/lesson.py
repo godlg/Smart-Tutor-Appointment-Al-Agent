@@ -8,10 +8,11 @@
 - 退课（POST /api/lessons/{id}/cancel，含退费）
 - 系列课查询（GET /api/lesson-series/{id}）
 - 冲突预览（POST /api/lessons/{id}/reschedule-preview）
+- 调课请求（POST/GET /api/lessons/{id}/change-requests，C2a：待老师确认，不立即改期）
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Literal, Optional
 from datetime import datetime, date as DateType
 from pydantic import BaseModel, Field
 
@@ -402,3 +403,44 @@ async def list_student_series(student_id: Optional[int] = None):
         return {"success": True, "data": series_list, "count": len(series_list)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# 调课请求（C2a：调课需老师确认）
+# ============================================
+
+class ChangeRequestCreate(BaseModel):
+    new_time: datetime
+    mode: Literal["only_this", "this_and_following"] = "only_this"
+    # 未鉴权:与本文件其它 C 端端点一致,调用方可自报身份
+    requested_by: Optional[str] = "parent"
+
+
+@router.post("/{lesson_id}/change-requests", summary="提交调课请求（待老师确认，不立即改期）")
+async def create_change_request(lesson_id: int, request: ChangeRequestCreate):
+    from services.lesson_change_service import LessonChangeError, LessonChangeService
+
+    service = LessonChangeService()
+    try:
+        result = service.create_request(
+            lesson_id=lesson_id,
+            new_time=request.new_time,
+            mode=request.mode,
+            requested_by=request.requested_by or "parent",
+        )
+        return {"success": True, **result}
+    except LessonChangeError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    finally:
+        service.close()
+
+
+@router.get("/{lesson_id}/change-requests", summary="课时的调课请求列表（按创建时间倒序）")
+async def list_change_requests(lesson_id: int):
+    from services.lesson_change_service import LessonChangeService
+
+    service = LessonChangeService()
+    try:
+        return {"success": True, "data": service.list_for_lesson(lesson_id)}
+    finally:
+        service.close()
