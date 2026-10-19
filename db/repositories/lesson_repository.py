@@ -3,10 +3,25 @@
 """
 
 from typing import List, Dict, Any, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 from sqlalchemy import and_, or_
 from ..base.session_manager import SessionManager
 from ..models import Lesson, LessonSeries, TrialFeedback
+
+# 库内 scheduled_at 存的是北京时间 naive（无 tzinfo）。这里直接构造时区，不 import config，
+# 保持 db 层不依赖业务配置。
+_BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def _to_db_naive(value):
+    """把入参归一成与库内一致的北京时间 naive，用于和 DB 行做比较。
+
+    aware → 转北京时间后去掉 tzinfo；naive（或 None、date）原样返回，零行为变化。
+    只作用于查询入参，不改 DB 行的值。
+    """
+    if getattr(value, "tzinfo", None) is None:
+        return value
+    return value.astimezone(_BEIJING_TZ).replace(tzinfo=None)
 
 
 class LessonRepository:
@@ -58,6 +73,8 @@ class LessonRepository:
         self, teacher_id: int, status: str = None,
         start_date: datetime = None, end_date: datetime = None,
     ) -> List[Dict[str, Any]]:
+        start_date = _to_db_naive(start_date)
+        end_date = _to_db_naive(end_date)
         with self.session_manager.session_scope() as session:
             q = session.query(Lesson).filter(Lesson.teacher_id == teacher_id)
             if status:
@@ -135,6 +152,8 @@ class LessonRepository:
         exclude_lesson_id: int = None,
     ) -> bool:
         """检查老师在该时段是否已被预约（返回 True 表示有冲突）"""
+        start_time = _to_db_naive(start_time)
+        end_time = _to_db_naive(end_time)
         with self.session_manager.session_scope() as session:
             q = session.query(Lesson).filter(
                 Lesson.teacher_id == teacher_id,
@@ -156,6 +175,8 @@ class LessonRepository:
         self, student_id: int, start_time: datetime, end_time: datetime,
         exclude_lesson_id: int = None,
     ) -> bool:
+        start_time = _to_db_naive(start_time)
+        end_time = _to_db_naive(end_time)
         with self.session_manager.session_scope() as session:
             q = session.query(Lesson).filter(
                 Lesson.student_id == student_id,

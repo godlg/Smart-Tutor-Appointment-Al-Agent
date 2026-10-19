@@ -8,7 +8,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)
 ![Orchestration](https://img.shields.io/badge/Orchestration-LangGraph%20%7C%20LangChain-1C3C3C)
-![Tests](https://img.shields.io/badge/tests-1621%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1645%20passed-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 </div>
@@ -21,7 +21,7 @@
 
 本项目把这条链路做成一个可运行的多 Agent 系统：家长用自然语言提问，系统先识别意图，再把任务分发给对应的专业 Agent，完成老师匹配、试讲预约与转化、正式课/系列课排课与调课退课、RAG 知识问答、学习进度与流失预警，并在 AI 处理不了时把会话交给人工。
 
-技术栈 FastAPI + LangChain/LangGraph + SQLAlchemy(SQLite) + FAISS，五层单向依赖架构，28 张表 / 76 条路由 / 10 类意图 / 1621 条测试全绿。
+技术栈 FastAPI + LangChain/LangGraph + SQLAlchemy(SQLite) + FAISS，五层单向依赖架构，28 张表 / 76 条路由 / 10 类意图 / 1645 条测试全绿。
 
 ## 核心能力
 
@@ -35,7 +35,7 @@
 **业务闭环**
 
 - **试讲 → 转正式课漏斗**：多轮补齐需求 → 创建试讲 → 课后 1-5 星反馈 → 套餐推荐 → 一键转正式课 / 系列课
-- **系列课与冲突检测**：单次试讲 / 单次正式课 / 周固定系列课 / 补课；按 `weekly_pattern` 展开，含时间冲突预检、调课、退课（审计保留）
+- **系列课与冲突检测**：单次试讲 / 单次正式课 / 周固定系列课 / 补课；按 `weekly_pattern` 展开，含时间冲突预检、调课（家长发起 → 老师确认后生效）、退课（审计保留）
 - **老师匹配**：综合学科、年级、风格、预算、评分打分，支持硬过滤与软匹配双模式
 - **续费与流失预警**：`RenewalDetector`（剩余课时 ≤ 3 或有效期 < 14 天）触发提醒；`ChurnPredictor` 按活跃度评估流失风险
 - **人工接管（Human-in-the-loop）**：主动关键词 + 被动「反复踢回」阈值双通道触发；触发时快照会话 transcript 落库，客服可 claim / reply / 查看消息，家长端轮询取回复
@@ -183,13 +183,13 @@ python scripts/demo_query_transform.py           # query 变换：off / rule / l
 ## 测试与评估
 
 ```bash
-pytest tests/ -q                     # 1621 passed（2026-10-19 实测）
+pytest tests/ -q                     # 1645 passed（2026-10-19 实测）
 python -m eval.runner                # EDD 冻结用例 + 发布门禁
 ```
 
 | 指标 | 实测值 |
 | --- | --- |
-| 单元 / 集成测试 | 1621 passed（81 个测试文件） |
+| 单元 / 集成测试 | 1645 passed（83 个测试文件） |
 | 冻结评估用例 | 67 条（routing 12 / rag 24 / slot 10 / tool 7 / handoff 6 / safety 8） |
 | 发布门禁 | 10 项阈值全过（`eval/gates.py` 读 `config/evals.yaml`；`--only` 子集模式输出 PARTIAL 且只校验已跑类别） |
 | 数据表 / API 路由 / 意图类别 | 28 / 76 / 10 |
@@ -206,7 +206,7 @@ python -m eval.runner                # EDD 冻结用例 + 发布门禁
 ├── config/          # 设置、模型 Provider 工厂、时间语义、组件工厂、门禁阈值
 ├── web/             # Web 页面与模板（16 个页面）
 ├── scripts/         # 演示、重建 embedding、下载精排模型等工具脚本
-├── tests/           # 1621 条测试
+├── tests/           # 1645 条测试
 ├── app.py           # 应用入口（路由注册、初始化、调度器）
 └── requirements.txt
 ```
