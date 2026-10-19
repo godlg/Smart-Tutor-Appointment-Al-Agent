@@ -29,6 +29,7 @@ from agents.lesson.change_processor import (
 from agents.lesson.reschedule_handler import RescheduleMode
 from agents.task_classification.agent_router import AgentRouter
 from agents.task_classification.classification_processor import ClassificationProcessor
+from services.lesson_change_service import LessonChangeError
 
 UNSUPPORTED_MARKER = "超出我的能力范围"
 
@@ -306,7 +307,7 @@ def _build_change_processor(lessons, parsed_data):
     processor.llm = MagicMock()
     processor.parser = _FakeParser()
     processor.message_builder = LessonChangeMessageBuilder()
-    processor.reschedule_handler = MagicMock()
+    processor.change_service = MagicMock()
     processor.cancel_handler = MagicMock()
 
     processor.student_service = MagicMock()
@@ -316,6 +317,19 @@ def _build_change_processor(lessons, parsed_data):
     processor.teacher_service = MagicMock()
     processor.teacher_service.get_teacher_by_id.return_value = {"name": "张老师"}
     return processor
+
+
+def _created_result(mode):
+    """LessonChangeService.create_request 成功新建时的返回形状"""
+    return {
+        "created": True,
+        "request": {
+            "id": 1,
+            "mode": mode,
+            "new_scheduled_at": datetime(2030, 6, 7, 16, 0),
+            "status": "pending",
+        },
+    }
 
 
 def _make_lesson(lesson_id=101, days_ahead=2, series_id=None):
@@ -345,7 +359,7 @@ class TestLessonChangeProcessor:
 
         # Assert
         assert "没有待上的课时" in output
-        processor.reschedule_handler.reschedule.assert_not_called()
+        processor.change_service.create_request.assert_not_called()
 
     def test_reschedule_calls_handler_with_parsed_time(self):
         # Arrange
@@ -358,7 +372,9 @@ class TestLessonChangeProcessor:
                 "reason": "未知",
             },
         )
-        processor.reschedule_handler.reschedule.return_value = (True, "调课成功")
+        processor.change_service.create_request.return_value = _created_result(
+            mode=RescheduleMode.ONLY_THIS,
+        )
 
         # Act
         output = _run(_collect(
@@ -366,12 +382,14 @@ class TestLessonChangeProcessor:
         ))
 
         # Assert
-        processor.reschedule_handler.reschedule.assert_called_once_with(
+        processor.change_service.create_request.assert_called_once_with(
             lesson_id=101,
             new_time=datetime(2030, 6, 7, 16, 0, tzinfo=timezone(timedelta(hours=8))),
             mode=RescheduleMode.ONLY_THIS,
+            requested_by="parent",
         )
-        assert "调课成功" in output
+        assert "等待老师确认" in output
+        assert "调课成功" not in output
 
     def test_reschedule_cascade_scope_is_passed_through(self):
         # Arrange
@@ -384,7 +402,9 @@ class TestLessonChangeProcessor:
                 "reason": "未知",
             },
         )
-        processor.reschedule_handler.reschedule.return_value = (True, "级联调课成功")
+        processor.change_service.create_request.return_value = _created_result(
+            mode=RescheduleMode.THIS_AND_FOLLOWING,
+        )
 
         # Act
         _run(_collect(
@@ -393,7 +413,7 @@ class TestLessonChangeProcessor:
 
         # Assert
         assert (
-            processor.reschedule_handler.reschedule.call_args.kwargs["mode"]
+            processor.change_service.create_request.call_args.kwargs["mode"]
             == RescheduleMode.THIS_AND_FOLLOWING
         )
 
@@ -408,8 +428,8 @@ class TestLessonChangeProcessor:
                 "reason": "未知",
             },
         )
-        processor.reschedule_handler.reschedule.return_value = (
-            False, "新时间冲突：老师已被预约",
+        processor.change_service.create_request.side_effect = LessonChangeError(
+            "新时间冲突：老师已被预约", 409,
         )
 
         # Act
@@ -440,7 +460,7 @@ class TestLessonChangeProcessor:
 
         # Assert
         assert "希望改到什么时间" in output
-        processor.reschedule_handler.reschedule.assert_not_called()
+        processor.change_service.create_request.assert_not_called()
 
     def test_cancel_calls_handler_and_shows_refund(self):
         # Arrange
@@ -503,7 +523,7 @@ class TestLessonChangeProcessor:
         assert "没能确定" in output
         assert "ID 101" in output  # 列出候选课时供家长选择
         processor.cancel_handler.cancel_lesson.assert_not_called()
-        processor.reschedule_handler.reschedule.assert_not_called()
+        processor.change_service.create_request.assert_not_called()
 
     def test_service_failure_degrades_to_no_lesson_message(self):
         """services 查询异常时不应把异常栈抛给家长"""

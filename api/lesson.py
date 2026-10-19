@@ -61,6 +61,10 @@ class RescheduleRequest(BaseModel):
         default="only_this",
         description="only_this | this_and_following",
     )
+    immediate: bool = Field(
+        default=False,
+        description="false(默认)=提交调课请求待老师确认；true=立即改期（机构/系统代改）",
+    )
 
 
 class CancelRequest(BaseModel):
@@ -136,14 +140,50 @@ async def create_lesson(request: CreateLessonRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{lesson_id}/reschedule", summary="调课")
+def _submit_reschedule_request(lesson_id: int, request: RescheduleRequest) -> Dict[str, Any]:
+    """默认路径：只提交调课请求，课时时间不变，等老师确认后才生效"""
+    from services.lesson_change_service import LessonChangeError, LessonChangeService
+
+    service = LessonChangeService()
+    try:
+        result = service.create_request(
+            lesson_id=lesson_id,
+            new_time=request.new_time,
+            mode=request.mode or "only_this",
+            requested_by="parent",
+        )
+    except LessonChangeError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    finally:
+        service.close()
+
+    if result["created"]:
+        message = "调课申请已提交，等待老师确认，确认前课时时间不变"
+    else:
+        message = "该课时已有待老师确认的调课申请，已返回原申请"
+    return {
+        "success": True,
+        "message": message,
+        "status": "pending_teacher_confirm",
+        "request_id": result["request"]["id"],
+        "created": result["created"],
+    }
+
+
+@router.post("/{lesson_id}/reschedule", summary="调课（默认提交老师确认请求；immediate=true 立即改期）")
 async def reschedule_lesson(lesson_id: int, request: RescheduleRequest):
     """
     调课，支持单次和系列级联
     mode:
       - only_this: 只调这一次
       - this_and_following: 调这次及之后所有周（系列级联）
+    immediate:
+      - false（默认）: 提交调课请求，状态 pending_teacher_confirm，课时时间不变，老师确认后才生效
+      - true: 立即改期，绕过老师确认（机构/系统代改走这里）
     """
+    if not request.immediate:
+        return _submit_reschedule_request(lesson_id, request)
+
     try:
         from agents.lesson import RescheduleHandler, RescheduleMode
 

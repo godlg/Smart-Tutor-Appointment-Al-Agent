@@ -517,7 +517,7 @@ def score_teacher_for_student(teacher: Teacher, student: StudentProfile) -> floa
 | POST | `/api/lessons` | 创建单次课 |
 | POST | `/api/lesson-series` | 创建周固定系列 |
 | GET | `/api/lesson-series/{id}` | 查看系列 |
-| POST | `/api/lessons/{id}/reschedule` | 调课（单次 + 联动） |
+| POST | `/api/lessons/{id}/reschedule` | 调课请求（默认待老师确认，课时不变；`immediate=true` 立即改期，单次 + 联动） |
 | POST | `/api/lessons/{id}/cancel` | 退课 |
 | GET | `/api/teachers` | 老师列表 + 推荐 |
 | GET | `/api/teachers/{id}` | 老师详情 |

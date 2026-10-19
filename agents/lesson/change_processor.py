@@ -20,7 +20,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from .cancel_handler import CancelHandler
-from .reschedule_handler import RescheduleHandler, RescheduleMode
+from .reschedule_handler import RescheduleMode
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +194,47 @@ class LessonChangeMessageBuilder:
             f"📌 已同步给老师，上课前 1 小时仍会有提醒。\n"
         )
 
+    def create_change_request_submitted_message(
+        self, lesson: Dict[str, Any], new_time_str: str, result: Dict[str, Any]
+    ) -> str:
+        # 注意：文案只能说「申请已提交」，绝不能出现「调课成功」，否则等于对家长谎报已生效
+        is_cascade = result["request"]["mode"] == "this_and_following"
+        cascade_str = "是（这次及之后每周的课都一起改）" if is_cascade else "否（只改这一次）"
+        return (
+            f"\n助手：📝 调课申请已提交，等待老师确认。\n\n"
+            f"📚 **申请信息**\n"
+            f"- 课时 ID：{lesson.get('id')}\n"
+            f"- 学科：{lesson.get('subject') or ''}\n"
+            f"- 申请改到：{new_time_str}\n"
+            f"- 是否需要级联：{cascade_str}\n\n"
+            f"⏳ 调课尚未生效，老师确认后才会改期，确认结果会再通知您。"
+            f"在此之前课程仍按原时间上课。\n"
+        )
+
+    def create_change_request_duplicate_message(
+        self, lesson: Dict[str, Any], new_time_str: str, result: Dict[str, Any]
+    ) -> str:
+        pending_time = result["request"]["new_scheduled_at"]
+        pending_str = (
+            pending_time.strftime("%Y-%m-%d %H:%M")
+            if hasattr(pending_time, "strftime")
+            else str(pending_time)
+        )
+        # 幂等命中时系统只保留已有的那条申请，本次提出的时间若不同则明确告知未被记录
+        unrecorded_str = (
+            "" if new_time_str == pending_str
+            else f"您这次提出的 {new_time_str} 没有被记录；如需改成其它时间，请等老师处理完这次申请。\n"
+        )
+        return (
+            f"\n助手：您这节课的调课申请已经提交过了，目前正在等待老师确认。\n\n"
+            f"📚 **申请信息**\n"
+            f"- 课时 ID：{lesson.get('id')}\n"
+            f"- 学科：{lesson.get('subject') or ''}\n"
+            f"- 已申请改到：{pending_str}\n"
+            f"{unrecorded_str}\n"
+            f"⏳ 调课尚未生效，老师确认后才会改期。\n"
+        )
+
     def create_reschedule_failed_message(self, detail: str) -> str:
         return (
             f"\n助手：抱歉，这次调课没有成功：{detail}\n"
@@ -231,8 +272,8 @@ class LessonChangeMessageBuilder:
 class LessonChangeProcessor:
     """调课 / 退课流程处理器
 
-    对话入口的调课/退课都走这里：先定位课时，再复用
-    RescheduleHandler / CancelHandler 执行。
+    对话入口的调课/退课都走这里：先定位课时。调课只提交「调课请求」，等老师确认后才生效；
+    退课仍直接复用 CancelHandler 执行。
     """
 
     def __init__(self, llm: BaseChatModel, context_manager=None):
@@ -240,9 +281,10 @@ class LessonChangeProcessor:
         # 可空统一上下文管理器,透传给调课/退课解析器
         self.parser = LessonChangeParser(llm, context_manager=context_manager)
         self.message_builder = LessonChangeMessageBuilder()
-        self.reschedule_handler = RescheduleHandler()
         self.cancel_handler = CancelHandler()
 
+        # services 层依赖 agents.lesson，这里必须延迟 import，否则循环依赖
+        from services.lesson_change_service import LessonChangeService
         from services.lesson_service import LessonService
         from services.student_profile_service import StudentProfileService
         from services.teacher_service import TeacherService
@@ -250,6 +292,7 @@ class LessonChangeProcessor:
         self.lesson_service = LessonService()
         self.student_service = StudentProfileService()
         self.teacher_service = TeacherService()
+        self.change_service = LessonChangeService()
 
     async def handle_change_request(
         self, user_input: str, intent: str
@@ -314,6 +357,7 @@ class LessonChangeProcessor:
         self, lesson: Dict[str, Any], data: Dict[str, Any]
     ) -> AsyncGenerator[str, None]:
         from config.time_config import time_config
+        from services.lesson_change_service import LessonChangeError
 
         new_time_str = data.get("new_time")
         new_time = (
@@ -330,16 +374,23 @@ class LessonChangeProcessor:
             if data.get("scope") == RescheduleMode.THIS_AND_FOLLOWING
             else RescheduleMode.ONLY_THIS
         )
-        success, message = self.reschedule_handler.reschedule(
-            lesson_id=lesson["id"], new_time=new_time, mode=mode
-        )
-
-        if success:
-            reply = self.message_builder.create_reschedule_success_message(
-                lesson, time_config.format_datetime(new_time), message
+        # 对话入口拿不到家长身份（LessonAgent 只有默认学生），requested_by 固定为 "parent"
+        new_time_str = time_config.format_datetime(new_time)
+        try:
+            result = self.change_service.create_request(
+                lesson_id=lesson["id"], new_time=new_time, mode=mode, requested_by="parent",
             )
+        except LessonChangeError as e:
+            reply = self.message_builder.create_reschedule_failed_message(e.message)
         else:
-            reply = self.message_builder.create_reschedule_failed_message(message)
+            if result["created"]:
+                reply = self.message_builder.create_change_request_submitted_message(
+                    lesson, new_time_str, result
+                )
+            else:
+                reply = self.message_builder.create_change_request_duplicate_message(
+                    lesson, new_time_str, result
+                )
         yield f"[REPLY][正式课助手]{reply}"
 
     async def _handle_cancel(
