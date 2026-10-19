@@ -3,9 +3,9 @@
 # cases_dir: 冻结评估集目录 (六类 JSON)
 # gates:     发布门禁阈值 (任一不达 → eval.runner exit 1)
 #
-# 指标口径 (与 eval/runner.py 实现一一对应):
+# 指标口径 (与 eval/runner.py / eval/rag_eval.py 实现一一对应):
 #   routing_min_accuracy:    路由意图分类精确匹配率 (正确数/总数)
-#   rag_min_recall_at_3:      Recall@3 (各 case Recall@k 均值, 复用 RecallAtKEvaluator)
+#   rag_min_recall_at_3:      Recall@3 (各 case Recall@k 均值)
 #   slot_min_accuracy:        槽位字段完全匹配率 (每 case 期望字段逐字段比对通过才算 1)
 #   tool_min_success:         tool_called 与期望一致的比例
 #   handoff_min_accuracy:     状态序列一致的比例 (逐 turn 期望状态完全匹配)
@@ -13,11 +13,31 @@
 #   max_p95_latency_ms:       所有 case 延迟 P95 (毫秒)
 #   max_token_cost:           估算总 Token 消耗 (LLM 输入+输出, 按 usage 或 len/4 估算)
 #   max_agent_steps:          tool/handoff 类单 case 最大步数上限 (agentic 循环轮数)
+#
+# rag 门禁说明 (v2, 2026-10 起):
+#   rag 评估走**真检索链** HybridVectorStore (dense + BM25 + RRF + bge 精排) +
+#   确定性**词袋桩** embedding, 语料是生产库只读采样的 34 篇真实 chunk、
+#   24 条口语化 query (与语料最长公共子串最大 6 字, 反逐字改写守卫生效)。
+#
+#   词袋桩: 只反映词重合 (jieba 分词 → 词哈希 → 子线性 tf → L2 归一化),
+#   **不代表真实 embedding 的语义召回能力**。真实数值用 EVAL_RAG_LIVE=1 跑。
+#   (上一版用 sha256 噪声桩 —— 零语义, dense 路召回随机文档, 测出的
+#    「hybrid 打不过 BM25」是评测工具的假象; 已在 delta 2 修掉。)
+#
+#   新基线 (词袋桩 + bge 精排 + RAG_MIN_RERANK_SCORE 默认关闭):
+#       recall@3 = 0.9167 (22/24), empty_recall_rate = 0.0833 (2/24)
+#       对照 BM25 单路: recall 0.6667 / empty 0.3333  ← hybrid 显著更强
+#   阈值取值: 保留 ≥0.05 余量, 同时**不贴基线满分线**以保持区分度 ——
+#       recall 0.80 = 基线 0.9167 - 0.1167 (约 2.8 条 case 的抖动空间)
+#       empty  0.12 = 基线 0.0833 + 0.0367 (约 3 条 case 的抖动空间)
 evals:
   cases_dir: eval/cases
   gates:
     routing_min_accuracy: 0.85
+    # 新基线 0.9167; 留 0.1167 余量(≈2.8 条 case), 不贴满分线
     rag_min_recall_at_3: 0.80
+    # 上限型: 新基线 0.0833; 留 0.0367 余量(≈3 条 case)
+    rag_max_empty_recall_rate: 0.12
     slot_min_accuracy: 0.85
     tool_min_success: 0.80
     handoff_min_accuracy: 0.85

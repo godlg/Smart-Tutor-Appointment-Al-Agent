@@ -402,8 +402,8 @@ class TestTextChunker:
     def test_chunker_settings_defaults(self):
         from services.text_chunker import ChunkerSettings
         s = ChunkerSettings()
-        assert s.chunk_size == 1000
-        assert s.chunk_overlap == 200
+        assert s.chunk_size == 500
+        assert s.chunk_overlap == 50
 
 
 # ----------------------------------------------------------------------
@@ -538,13 +538,35 @@ class TestApiUpload:
 
     KnowledgeService 默认 db_path 由 tests/conftest.py 强制为 :memory:,
     无需在本类内 monkeypatch。
+
+    控制台分面 B 起 `/api/knowledge` 整个 router 挂 academic / admin 闸门,
+    所以本类先显式临时库登录 academic,再打端点。
     """
 
     @pytest.fixture
-    def client(self):
+    def client(self, monkeypatch, tmp_path):
         from fastapi.testclient import TestClient
         from app import app
-        return TestClient(app)
+        from api.core import console_auth as console_dep
+        from config.console_auth import CONSOLE_COOKIE_NAME
+        from services.console_auth_service import ConsoleAuthService
+
+        console_db = f"sqlite:///{(tmp_path / 'console_knowledge.db').as_posix()}"
+        original_init = ConsoleAuthService.__init__
+
+        def _patched_init(self, db_path=None, *args, **kwargs):
+            original_init(self, db_path=db_path or console_db)
+
+        monkeypatch.setattr(ConsoleAuthService, "__init__", _patched_init)
+        monkeypatch.setattr(console_dep, "_console_auth_service", None, raising=False)
+        ConsoleAuthService(db_path=console_db).ensure_default_users()
+
+        client = TestClient(app)
+        login = client.post("/api/console/login",
+                            json={"username": "academic", "password": "academic12345"})
+        assert login.status_code == 200, login.text
+        assert CONSOLE_COOKIE_NAME in login.cookies
+        return client
 
     def _post(self, client, *, filename, content, content_type, **fields):
         return client.post(

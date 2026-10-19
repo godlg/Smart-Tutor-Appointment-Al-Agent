@@ -6,6 +6,7 @@ from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +64,31 @@ async def lifespan(app: FastAPI):
         logger.info("AutoDream 调度服务已停止")
 
 
+def log_database_target():
+    """启动日志: 明确说出本次实际连接的是哪个库文件。
+
+    DATABASE_URL 目前不参与库路径解析 (只被无人引用的 config/database.py 读取),
+    这里在它被设置却被忽略时给出明确告警,避免误以为切库成功。
+    """
+    from db.db_router import DEFAULT_DB_PATH
+
+    # sqlite:///<path> -> <path>;绝对化只为方便一眼确认是哪个文件
+    db_file = DEFAULT_DB_PATH.split("sqlite:///")[-1]
+    logger.info(f"🗄️ 数据库目标: {DEFAULT_DB_PATH} (绝对路径: {os.path.abspath(db_file)})")
+
+    env_db_url = os.environ.get("DATABASE_URL")
+    if env_db_url and env_db_url != DEFAULT_DB_PATH:
+        logger.warning(
+            f"⚠️ DATABASE_URL={env_db_url} 当前被忽略(未生效), 实际仍使用默认库 "
+            f"{DEFAULT_DB_PATH} —— 若要换库请显式传 db_path"
+        )
+
+
 async def initialize_system():
     """系统启动时自动初始化"""
     try:
         logger.info("🚀 正在初始化家教智能预约系统...")
+        log_database_target()
 
         # 知识库初始化
         logger.info("📚 初始化知识库服务...")
@@ -86,6 +108,11 @@ async def initialize_system():
         logger.info("📦 初始化套餐数据...")
         from services.package_service import PackageService
         PackageService().initialize_default_packages()
+
+        logger.info("🔐 初始化控制台默认账号...")
+        from services.console_auth_service import ConsoleAuthService
+        ConsoleAuthService().ensure_default_users()
+        ConsoleAuthService().ensure_default_teacher_accounts()
 
         # 推荐服务
         logger.info("🎯 启动推荐调度服务...")

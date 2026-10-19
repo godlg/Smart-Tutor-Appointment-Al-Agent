@@ -8,6 +8,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from services.knowledge_service import KnowledgeService
 from services.hybrid_retriever import HybridRetriever
+from services.query_transform import variants_async
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -71,16 +72,27 @@ class KnowledgeRetriever:
         # 历史上下文拼到查询前,让"计算薄弱"这类指代不清的追问能借历史(初二、数学)召回更准
         effective_query = (query_context + "\n" + query).strip() if query_context else query
 
-        # 搜索相关知识(实际送入检索的是 effective_query)
+        # 检索前 query 变换(多查询): off 档只有原串, 任何异常都回退 [effective_query]
+        try:
+            search_queries = await variants_async(
+                effective_query,
+                context_text=query_context,
+                history_text=query_context,
+            )
+        except Exception as exc:  # noqa: BLE001 - 变换失败不影响检索
+            logger.warning("query 变换失败，回退原始查询: %s", exc)
+            search_queries = [effective_query]
+
+        # 搜索相关知识(实际送入检索的是 search_queries, [0] 恒为 effective_query)
         try:
             if self.retrieval_mode == "hybrid":
-                relevant_docs = await self.hybrid_retriever.search(
-                    effective_query, top_k=top_k,
+                relevant_docs = await self.hybrid_retriever.search_multi(
+                    search_queries, top_k=top_k,
                     subject=subject, grade_level=grade_level,
                 )
             else:
-                relevant_docs = await self.knowledge_service.search(
-                    effective_query, top_k=top_k,
+                relevant_docs = await self.knowledge_service.search_multi(
+                    search_queries, top_k=top_k,
                     subject=subject, grade_level=grade_level,
                 )
         except Exception as exc:  # noqa: BLE001 - 检索失败降级为空召回
@@ -91,6 +103,7 @@ class KnowledgeRetriever:
         self._log_search_results(
             effective_query, relevant_docs,
             subject=subject, grade_level=grade_level,
+            variants=search_queries,
         )
 
         return relevant_docs or []
@@ -101,9 +114,12 @@ class KnowledgeRetriever:
         relevant_docs: List[Dict[str, Any]],
         subject: Optional[str] = None,
         grade_level: Optional[str] = None,
+        variants: Optional[List[str]] = None,
     ):
-        """记录搜索结果日志(带本轮生效的元数据硬约束,便于端到端排查召回)。"""
+        """记录搜索结果日志(带本轮生效的元数据硬约束 + query 变体数,便于端到端排查召回)。"""
         filters = f" [学科:{subject or '-'} 年级:{grade_level or '-'}]"
+        if variants:
+            filters += f" [variants={len(variants)}]"
         if relevant_docs:
             print(f"🔍 知识库检索结果{filters} (查询: '{query}'):")
             for i, doc in enumerate(relevant_docs, 1):

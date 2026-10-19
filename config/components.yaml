@@ -10,6 +10,17 @@
 #   vector_store.type 改为 hybrid → Dense + BM25 + RRF + 可选精排 (默认)
 #   reranker.type 改为 none       → 跳过精排, 原样返回候选
 #   evaluator.k 改为 5            → Recall@5 / MRR@5
+#
+# ⚠ splitter 的 chunk_size / overlap 必须与 CHUNK_SIZE / CHUNK_OVERLAP 一致
+#   (上传路径 services/knowledge_service.py 读的是 settings, 不是本文件)。
+#   改一处漏改另一处会被 tests/test_rag_pipeline_hardening.py 的防漂移断言打红。
+#
+# ⚠ 精排相关性阈值 RAG_MIN_RERANK_SCORE **默认关闭**(不设阈值, 不过滤)。
+#   开启前必须按目标模型量纲校准: bge 的 logit 随 query 口语化程度整体下移,
+#   0.0 不是中性分界 —— 实测 24 条口语化 query 里 12 条的正确答案精排分为负
+#   (多为排名第 1), 设 0.0 会把 recall@3 从 0.9167 打到 0.5000。
+#   阈值机制本身保留(见 services/hybrid_retriever.py::min_rerank_score_default)。
+#   NOTE: 本文件不声明该阈值 —— 它只由 env RAG_MIN_RERANK_SCORE 决定。
 
 components:
   llm: { type: openai_compatible, temperature: 0 }

@@ -12,10 +12,27 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# 精排 tokenizer 截断长度。中文场景 ~1 字 ≈ 1 token, chunk 默认 500 字,
+# 512 足够覆盖整块 (env RERANK_MAX_LENGTH 可覆盖)
+DEFAULT_MAX_LENGTH = 512
+
+
+def max_length() -> int:
+    """精排 tokenizer 截断长度 (env RERANK_MAX_LENGTH, 默认 512)。"""
+    raw = os.getenv("RERANK_MAX_LENGTH")
+    if raw is None or not raw.strip():
+        return DEFAULT_MAX_LENGTH
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning(f"RERANK_MAX_LENGTH={raw!r} 非法, 回退默认 {DEFAULT_MAX_LENGTH}")
+        return DEFAULT_MAX_LENGTH
 
 # 模型目录: 项目根/cache/<name>/ (含 onnx/model*.onnx + tokenizer.json 等)
 _CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
@@ -89,7 +106,8 @@ def active_model() -> Optional[str]:
 def score_pair(query: str, document: str) -> float:
     """单对 (query, document) 精排打分。调用方保证 available()。"""
     enc = _tokenizer(
-        query, document, truncation=True, max_length=512, return_tensors="np"
+        query, document, truncation=True, max_length=max_length(),
+        return_tensors="np"
     )
     feed = {k: v.astype("int64") for k, v in enc.items()}
     logits = _session.run(None, feed)[0]

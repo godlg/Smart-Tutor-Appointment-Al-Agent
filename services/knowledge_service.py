@@ -7,8 +7,9 @@ import numpy as np
 import faiss
 from typing import List, Dict, Tuple, Optional
 from db.db_router import DatabaseRouter
+from config.settings import settings
 from . import document_parser
-from .text_chunker import TextChunker
+from .text_chunker import ChunkerSettings, TextChunker
 from .text_embedding import embed_input
 from observability import trace_span
 import logging
@@ -229,7 +230,7 @@ class KnowledgeService:
         grade_level: Optional[str] = None,
         doc_type: Optional[str] = None,
     ) -> List[Dict]:
-        """搜索相关文档。
+        """搜索相关文档(薄包装: 等价于 search_multi([query]))。
 
         P1-12 范式 A (filter-then-vector):
         - 若传了 subject / grade_level / doc_type 任一,先用 SQL 缩候选集,
@@ -247,6 +248,28 @@ class KnowledgeService:
         Returns:
             按相似度降序的文档列表;空列表表示无命中
         """
+        return await self.search_multi(
+            [query], top_k=top_k, category=category,
+            subject=subject, grade_level=grade_level, doc_type=doc_type,
+        )
+
+    async def search_multi(
+        self,
+        queries: List[str],
+        top_k: int = 3,
+        category: str = None,
+        subject: Optional[str] = None,
+        grade_level: Optional[str] = None,
+        doc_type: Optional[str] = None,
+    ) -> List[Dict]:
+        """多查询 Dense 检索: 每条 query 各检索一次, 按 doc_id 做 RRF 融合后截 top_k。
+
+        单条 query 时逐字沿用原检索路径(分数 = FAISS 相似度),不引入任何变化;
+        多条 query 时每条各取 rrf_candidates 深度,RRF 融合后取 top_k,
+        score 记为 rrf_score(跨 query 的分数量纲不可比,融合分才是可比的)。
+        """
+        if not queries:
+            queries = [""]
         if not self.initialized or self.index is None:
             logger.warning("知识库服务未初始化或索引不可用")
             return []
@@ -257,26 +280,65 @@ class KnowledgeService:
         has_meta_filter = any(
             v is not None for v in (subject, grade_level, doc_type)
         )
+        per_query_k = top_k if len(queries) == 1 else max(
+            top_k, settings.rrf_candidates
+        )
 
         # Trace 埋点(dense 路径):包一层 rag_search span,与 hybrid 同链路可嵌套
         with trace_span(
             "rag_search",
             mode="dense",
-            query=query[:30],
+            query=queries[0][:30],
             top_k=top_k,
             has_meta_filter=has_meta_filter,
         ) as span:
-            if not has_meta_filter:
-                results = await self._vector_search_full(
-                    query=query, top_k=top_k, category=category,
-                )
+            per_query_docs: List[List[Dict]] = []
+            for query in queries:
+                if not has_meta_filter:
+                    docs = await self._vector_search_full(
+                        query=query, top_k=per_query_k, category=category,
+                    )
+                else:
+                    docs = await self._vector_search_with_metadata_filter(
+                        query=query, top_k=per_query_k, category=category,
+                        subject=subject, grade_level=grade_level, doc_type=doc_type,
+                    )
+                per_query_docs.append(docs)
+
+            if len(queries) == 1:
+                results = per_query_docs[0]
             else:
-                results = await self._vector_search_with_metadata_filter(
-                    query=query, top_k=top_k, category=category,
-                    subject=subject, grade_level=grade_level, doc_type=doc_type,
-                )
+                results = self._fuse_dense(per_query_docs, top_k)
             span.attrs["result_count"] = len(results)
+            span.attrs["variants"] = len(queries)
             return results
+
+    @staticmethod
+    def _fuse_dense(
+        per_query_docs: List[List[Dict]], top_k: int
+    ) -> List[Dict]:
+        """按 doc_id 做 RRF 融合, 截 top_k;同一文档只保留一条(排名靠前的那份)。"""
+        from services.hybrid_retriever import rrf_merge
+
+        ranked_lists = [
+            [(int(d["id"]), rank) for rank, d in enumerate(docs, start=1)]
+            for docs in per_query_docs
+        ]
+        first_seen: Dict[int, Dict] = {}
+        for docs in per_query_docs:
+            for doc in docs:
+                first_seen.setdefault(int(doc["id"]), doc)
+
+        fused: List[Dict] = []
+        for doc_id, rrf_score in rrf_merge(ranked_lists, settings.rrf_k)[:top_k]:
+            doc = first_seen.get(doc_id)
+            if doc is None:
+                continue
+            item = dict(doc)
+            item["score"] = rrf_score
+            item["rank"] = len(fused) + 1
+            fused.append(item)
+        return fused
 
     async def _vector_search_full(
         self, query: str, top_k: int, category: Optional[str],
@@ -536,7 +598,7 @@ class KnowledgeService:
         1. sha256(file_bytes) 取 source_hash
         2. 若 not allow_duplicate 且 hash 已存在 → 返回 skipped
         3. document_parser.parse → text + title + kind
-        4. TextChunker().split → List[TextChunk]
+        4. TextChunker(settings.chunk_size/overlap).split → List[TextChunk]
         5. 每 chunk:embed → repo.add_document(...溯源列) → _add_to_index
 
         Raises:
@@ -567,8 +629,13 @@ class KnowledgeService:
             req.file_bytes, req.filename, req.content_type,
         )
 
-        # 4. 分块
-        chunks = TextChunker().split(parsed.text)
+        # 4. 分块 (参数从 settings 读,与 config/components.yaml 的 splitter 声明对齐)
+        chunks = TextChunker(
+            ChunkerSettings(
+                chunk_size=settings.chunk_size,
+                chunk_overlap=settings.chunk_overlap,
+            )
+        ).split(parsed.text)
         if not chunks:
             # splitter 偶尔返回空列表(全是空白),防御性抛错
             raise document_parser.EmptyDocument("分块结果为空")

@@ -560,3 +560,41 @@ class SessionCheckpoint(Base):
     payload = Column(Text, nullable=True)            # JSON:可安全恢复的业务字段
     pending_ops = Column(Text, nullable=True)        # JSON:时间敏感待执行命令
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# =====================================================================
+# 机构侧控制台账号与鉴权基座(控制台分面 A)
+#
+# 边界(勿夸大):这里只为「机构内部后台」建立账号/session 地基,
+# 与匿名家长身份(identities/identity_students)是两套独立体系,互不代表对方。
+# 建表不写迁移脚本:靠 SessionManager.__init__ 的 Base.metadata.create_all
+# (含在老库上补建新表)。
+# =====================================================================
+
+class ConsoleUser(Base):
+    """机构侧员工账号表(admin 教务主管 / support 客服 / academic 教研 / teacher 老师)。
+
+    命名债:表名 console_users 是历史命名,实际承载的是「机构侧员工账号」四种角色;
+    老师账号的 teacher_id 指向 teachers.id,员工账号为 NULL。暂不重命名。
+    """
+    __tablename__ = 'console_users'
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(64), unique=True, nullable=False, index=True)
+    password_hash = Column(String(256), nullable=False)   # pbkdf2_sha256$iters$salt_hex$digest_hex
+    role = Column(String(32), nullable=False)             # admin | support | academic | teacher
+    display_name = Column(String(64), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    teacher_id = Column(Integer, ForeignKey('teachers.id'), nullable=True, index=True)  # 仅 teacher 账号非空
+    created_at = Column(DateTime, default=datetime.now)
+
+
+class ConsoleSession(Base):
+    """控制台登录会话(服务端签发 token,过期即失效并被清理)。"""
+    __tablename__ = 'console_sessions'
+
+    token = Column(String(64), primary_key=True)
+    user_id = Column(Integer, ForeignKey('console_users.id'), nullable=False, index=True)
+    role = Column(String(32), nullable=False)             # 签发时快照,避免角色变更后旧会话静默提权
+    created_at = Column(DateTime, default=datetime.now)
+    expires_at = Column(DateTime, nullable=False)

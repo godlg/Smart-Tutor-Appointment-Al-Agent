@@ -32,6 +32,9 @@ schedule>=1.2.0
 requests>=2.25.0
 prometheus-client>=0.20
 
+# --- MCP (工具对外暴露, 只读默认开 / 写入默认关) ---
+mcp>=2.0
+
 # --- 测试 ---
 pytest>=8.0
 httpx>=0.27

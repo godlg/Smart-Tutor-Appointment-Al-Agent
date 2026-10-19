@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>机构后台</title>
+    <style>
+        :root {
+            --ink: #17222e;
+            --muted: #5d6b7a;
+            --line: #d5dde5;
+            --accent: #1f6feb;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 40px 28px 64px;
+            background: #f2f5f8;
+            color: var(--ink);
+            font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+        }
+        .wrap { max-width: 880px; margin: 0 auto; }
+        .topbar {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid var(--line);
+        }
+        .eyebrow {
+            font-size: 12px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        h1 { margin: 6px 0 0; font-size: 24px; font-weight: 600; }
+        .account { text-align: right; font-size: 13px; color: var(--muted); }
+        .account strong { display: block; color: var(--ink); font-size: 15px; }
+        .role {
+            display: inline-block;
+            margin-top: 4px;
+            padding: 2px 9px;
+            font-size: 12px;
+            color: var(--accent);
+            background: rgba(31, 111, 235, 0.1);
+            border-radius: 999px;
+        }
+        h2 {
+            margin: 36px 0 14px;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 16px;
+        }
+        .entry {
+            display: block;
+            padding: 22px 20px;
+            text-decoration: none;
+            color: inherit;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            transition: transform 120ms ease, border-color 120ms ease;
+        }
+        .entry:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent);
+        }
+        .entry .icon { font-size: 22px; }
+        .entry .name {
+            margin-top: 12px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .entry .desc {
+            margin-top: 5px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--muted);
+        }
+        .footer { margin-top: 34px; font-size: 12px; color: var(--muted); }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header class="topbar">
+            <div>
+                <div class="eyebrow">Smart Tutor</div>
+                <h1>机构后台</h1>
+            </div>
+            <div class="account">
+                <strong id="account-name">—</strong>
+                <span class="role" id="account-role">—</span>
+            </div>
+        </header>
+
+        <h2>功能入口</h2>
+        <nav class="grid" aria-label="后台功能入口">
+            <a class="entry" href="/console/human-handoff">
+                <div class="icon">🎧</div>
+                <div class="name">人工接管队列</div>
+                <div class="desc">查看转人工工单，认领、回复家长并标记已处理</div>
+            </a>
+            <a class="entry" href="/console/knowledge">
+                <div class="icon">📚</div>
+                <div class="name">知识库管理</div>
+                <div class="desc">浏览、检索、增删改知识条目与批量上传文档</div>
+            </a>
+            <a class="entry" href="/console/user_behavior_analysis">
+                <div class="icon">📈</div>
+                <div class="name">家长行为分析</div>
+                <div class="desc">基于历史预约数据分析家长偏好与回访时机</div>
+            </a>
+        </nav>
+
+        <p class="footer">家长侧页面在站点根路径访问，与本后台的账号体系相互独立。</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            try {
+                const response = await fetch('/api/console/me');
+                if (response.status !== 200) {
+                    document.getElementById('account-name').textContent = '未登录';
+                    document.getElementById('account-role').textContent = '未知';
+                    return;
+                }
+                const payload = await response.json();
+                const data = payload.data || {};
+                document.getElementById('account-name').textContent =
+                    data.display_name || data.username || '—';
+                document.getElementById('account-role').textContent = data.role || '—';
+            } catch (err) {
+                document.getElementById('account-name').textContent = '加载失败';
+                document.getElementById('account-role').textContent = '—';
+            }
+        });
+    </script>
+</body>
+</html>

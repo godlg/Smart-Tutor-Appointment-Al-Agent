@@ -1,102 +1,662 @@
 {
-  "version": "1.0.0",
-  "description": "RAG 评估集: Recall@k 命中率 (复用 services.components.RecallAtKEvaluator / QueryCase 结构)",
+  "version": "2.0.0",
+  "description": "RAG 评估集 v2: 生产真语料冻结快照 + 反逐字改写 query (Recall@k / MRR / NDCG@k / 空召回率)",
   "evaluator": "RecallAtKEvaluator",
   "k": 3,
+  "corpus_source": "rag.corpus.json (scripts/build_rag_eval_cases.py 自生产库只读采样)",
+  "min_common_substring": 12,
   "corpus": [
-    {
-      "doc_id": 1,
-      "content": "高中数学 12 周提分方案：函数、几何、数列、概率四大模块系统讲，重点章节以高考真题为载体，包含一对一作业批改、错题梳理、阶段测试三个环节，目标是高考数学从平均分提升 20-30 分。",
-      "keywords": ["高中", "数学", "高考", "12周", "提分", "课程介绍"],
-      "category": "course_intro"
-    },
-    {
-      "doc_id": 2,
-      "content": "高三冲刺套餐：针对 6 月高考设计，1 月到 5 月完成三轮复习，包含考点串讲、模拟考刷题、心理疏导、报考志愿指导，适合数学、英语、理综等全学科。",
-      "keywords": ["高三", "冲刺", "高考", "复习", "套餐"],
-      "category": "course_intro"
-    },
-    {
-      "doc_id": 3,
-      "content": "小学阅读启蒙课：以绘本为载体，每节课讲解一本经典绘本 + 词汇 + 简单造句 + 复述故事，目标是让孩子爱上阅读，建立自主阅读习惯。",
-      "keywords": ["小学", "阅读", "绘本", "启蒙", "阅读习惯"],
-      "category": "course_intro"
-    },
-    {
-      "doc_id": 4,
-      "content": "数学思维训练方法：1. 重视概念定义 2. 一题多解 3. 错题本 4. 主动总结题型。小学阶段最忌讳死记硬背公式，应该让孩子理解公式背后的几何直观。",
-      "keywords": ["数学", "思维", "方法", "小学", "错题本"],
-      "category": "subject_method"
-    },
-    {
-      "doc_id": 5,
-      "content": "初中数学 一元二次方程 解题套路与错题梳理方法：重点讲解判别式、根与系数关系(韦达定理)、动点问题等高频考点，配中考真题训练。",
-      "keywords": ["初中", "数学", "一元二次方程", "韦达定理", "中考"],
-      "category": "subject_method"
-    },
     {
       "doc_id": 6,
       "content": "如何帮孩子选择合适的家教老师：先看学科匹配（数学 / 物理 / 英语等），再看年级段（小学 / 初中 / 高中），最后考虑风格（严格 / 温和 / 启发式）和孩子的接受度。建议先安排一次 30 分钟试讲再决定。",
-      "keywords": ["家长", "选择", "老师", "试讲", "匹配"],
-      "category": "parent_guide"
+      "keywords": [
+        "家长",
+        "选择",
+        "老师",
+        "试讲",
+        "匹配"
+      ],
+      "subject": null,
+      "grade_level": null,
+      "source_file": null,
+      "category": "parent_guide",
+      "doc_type": "parent_guide"
+    },
+    {
+      "doc_id": 1,
+      "content": "高中数学 12 周提分方案：函数、几何、数列、概率四大模块系统讲，重点章节以高考真题为载体，包含一对一作业批改、错题梳理、阶段测试三个环节，目标是高考数学从平均分提升 20-30 分。",
+      "keywords": [
+        "高中",
+        "数学",
+        "高考",
+        "12周",
+        "提分",
+        "课程介绍"
+      ],
+      "subject": "数学",
+      "grade_level": "高中",
+      "source_file": null,
+      "category": "course_intro",
+      "doc_type": "course_intro"
+    },
+    {
+      "doc_id": 23,
+      "content": "│   ├── test_conversion_logic.py\r\n│   └── test_renewal_detector.py\r\n├── data/                                # SQLite 数据库与 FAISS 索引\r\n├── app.py                               # 应用入口\r\n├── requirements.txt                     # Python 依赖\r\n├── .env.example                         # 环境变量模板\r\n└── README.md\r\n```\r\n\r\n## 快速开始\r\n\r\n### 1. 创建虚拟环境\r\n\r\n```bash\r\npython -m venv .venv\r\n```\r\n\r\nWindows PowerShell：\r\n\r\n```powershell\r\n.\\.venv\\Scripts\\Activate.ps1\r\n```\r\n\r\nWindows CMD：\r\n\r\n```cmd\r\n.venv\\Scripts\\activate.bat\r\n```\r\n\r\nmacOS 或 Linux：\r\n\r\n```bash\r\nsource .venv/bin/activate\r\n```\r\n\r\n### 2. 安装依赖\r\n\r\n```bash\r\npip install -r requirements.txt\r\n```\r\n\r\n### 3. 配置环境变量\r\n\r\n复制环境变量模板：\r\n\r\n```bash\r\ncp .env.example .env\r\n```\r\n\r\nWindows PowerShell 可以使用：\r\n\r\n```powershell\r\nCopy-Item .env.example .env\r\n```\r\n\r\n然后在 `.env` 中填写模型和数据库配置。项目支持 OpenAI 兼容格式的大模型与 Embedding 服务。\r\n\r\n```env\r\nMODEL_PROVIDER=qwen\r\nLLM_API_KEY=your_llm_api_key_here\r\nLLM_BASE_URL=your_openai_compatible_chat_base_url_here\r\nLLM_MODEL=your_chat_model_name_here",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 63,
+      "content": "**答**：(1) 3.5 t = **3500** kg；(2) 4500 mg = **4.5** g\n\n---\n\n## 4.2 天平的使用\n\n### 📖 核心概念\n\n**托盘天平的使用步骤**：\n\n```\n    天平使用步骤：\n    \n    ① 放         ② 归零        ③ 调平        ④ 称量        ⑤ 读数\n    \n    ┌─────┐    ┌─────┐      ┌─────┐      ┌─────┐      ┌─────┐\n    │天平  │    │游码→│      │调节  │      │左物  │      │读数  │\n    │放水平│    │零刻度│      │平衡  │      │右码  │      │记录  │\n    │台面上│    │线处  │      │螺母  │      │     │      │     │\n    └─────┘    └─────┘      └─────┘      └─────┘      └─────┘\n```\n\n**读数公式**：$m_{物} = m_{砝码} + m_{游码}$\n\n> ⚠️ **注意事项**：\n> - 不能用手拿砝码（要用镊子）\n> - 不能测超过天平量程的物体\n> - 潮湿物品和化学药品不能直接放在托盘上\n\n---\n\n### 📝 例题 35：天平使用\n\n**题目**：用天平称量物体质量时，如果将物体放在了右盘、砝码放在了左盘，物体实际质量怎样计算？\n\n**解析**：\n\n| 放置方式 | 平衡关系 | 计算公式 |\n|----------|----------|----------|\n| 正常（左物右码） | 左盘质量 = 右盘质量 + 游码读数 | $m_{物} = m_{砝码} + m_{游码}$ |\n| 放反（左码右物） | $m_{砝码} = m_{物} + m_{游码}$ | $m_{物} = m_{砝码} - m_{游码}$ |\n\n**答**：放反时，$m_{物} = m_{砝码} - m_{游码}$。\n\n---\n\n### 📝 例题 36：天平读数\n\n**题目**：用天平测量物体质量，右盘中砝码为 50g、20g 各一个，游码在标尺上指示 3.2g 处，则物体的质量是多少？\n\n**解析**：",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 20,
+      "content": "│   └── core/                            # 统一响应模型与异常处理\r\n│       ├── response_models.py\r\n│       └── exceptions.py\r\n├── services/                            # 业务逻辑层\r\n│   ├── teacher_service.py               # 老师 CRUD + 筛选 + 默认数据\r\n│   ├── lesson_service.py                # 课时 CRUD + 冲突 + 系列课\r\n│   ├── package_service.py               # 套餐管理 + 默认数据\r\n│   ├── student_profile_service.py       # 学员档案 + 默认数据\r\n│   ├── progress_service.py              # 课后进度记录\r\n│   ├── knowledge_service.py             # 知识库管理 + FAISS\r\n│   ├── text_embedding.py                # Embedding 与向量处理\r\n│   ├── user_behavior_service.py         # 学员行为服务\r\n│   └── recommendation_service.py        # 老师打分 + 后台调度\r\n├── db/                                  # 数据持久化层\r\n│   ├── models.py                        # SQLAlchemy 模型（13 张表）\r\n│   ├── db_router.py                     # 数据库路由 + Repository 聚合\r\n│   ├── base/\r\n│   │   ├── session_manager.py           # Session 生命周期管理\r\n│   │   └── interfaces.py                # Repository 抽象接口",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 46,
+      "content": "**解析**：\n\n```\n┌─────────────────────────────────────────────────────┐\n│              学校降噪方案                             │\n├─────────────────────────────────────────────────────┤\n│                                                     │\n│  ① 声源处：                                         │\n│     • 校内禁止大声喧哗                               │\n│     • 施工单位使用低噪声设备                         │\n│     • 汽车在校附近禁止鸣笛                           │\n│                                                     │\n│  ② 传播过程中：                                     │\n│     • 学校周围种植树木（隔音林带）                   │\n│     • 安装隔音窗户                                   │\n│     • 在学校和马路之间建隔音墙                       │\n│                                                     │\n│  ③ 人耳处：                                         │\n│     • 学生在嘈杂时戴耳塞                             │\n│     • 关闭门窗                                       │\n│                                                     │\n└─────────────────────────────────────────────────────┘\n```",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 21,
+      "content": "│   ├── db_router.py                     # 数据库路由 + Repository 聚合\r\n│   ├── base/\r\n│   │   ├── session_manager.py           # Session 生命周期管理\r\n│   │   └── interfaces.py                # Repository 抽象接口\r\n│   └── repositories/                    # Repository 数据访问封装\r\n│       ├── knowledge_repository.py\r\n│       ├── teacher_repository.py\r\n│       ├── student_repository.py\r\n│       ├── lesson_repository.py\r\n│       ├── package_repository.py\r\n│       ├── progress_repository.py\r\n│       └── user_behavior_repository.py\r\n├── config/                              # 配置模块\r\n│   ├── constants.py                     # 常量与枚举\r\n│   ├── database.py                      # 数据库配置\r\n│   ├── model_provider.py                # 模型与 Embedding Provider 工厂\r\n│   ├── settings.py                      # 应用配置\r\n│   └── time_config.py                   # 时间与排课配置\r\n├── web/                                 # Web 页面层\r\n│   ├── routes.py                        # 页面路由\r\n│   ├── templates/                       # HTML 模板（11 个页面）",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 92,
+      "content": "$$v = \\sqrt{2gh} = \\sqrt{2 \\times 10 \\times 5} = \\sqrt{100} = 10 \\text{ m/s}$$\n\n**答**：到达底端时的速度是 10 m/s。\n\n---\n\n# 📗 第十章 小粒子与大宇宙\n\n---\n\n## 10.1 物质的组成\n\n### 📖 核心概念\n\n**物质的组成**：\n\n```\n    物质的微观结构：\n    \n    物质\n     └── 分子（保持化学性质的最小粒子）\n          └── 原子（化学变化中的最小粒子）\n               ├── 原子核（带正电，体积小质量大）\n               │    ├── 质子（带正电）\n               │    └── 中子（不带电）\n               └── 核外电子（带负电，绕核运动）\n```\n\n**分子动理论**：\n\n| 要点 | 内容 |\n|------|------|\n| ① | 物质是由大量**分子**组成的 |\n| ② | 分子在永不停息地做**无规则运动**（扩散现象） |\n| ③ | 分子之间存在**引力**和**斥力** |\n\n> 💡 **扩散现象**：不同物质相互接触时，彼此进入对方的现象。说明分子在不停地做无规则运动。\n\n---\n\n### 📝 例题 79：分子动理论\n\n**题目**：将一滴红墨水滴入一杯清水中，整杯水逐渐变红，这是什么现象？说明了什么？\n\n**解析**：\n\n- 红墨水的分子扩散到水分子之间\n- 水分子也扩散到红墨水分子之间\n- 最终整杯水变红\n\n**答**：这是**扩散现象**。说明：① 分子在永不停息地做无规则运动；② 分子之间有间隙。\n\n---\n\n### 📝 例题 80：分子间作用力\n\n**题目**：为什么固体和液体很难被压缩？这说明了什么？\n\n**解析**：\n\n```\n    分子间作用力：\n    \n    分子间距较小时：斥力 > 引力 → 表现为斥力 → 难压缩\n    分子间距较大时：引力 > 斥力 → 表现为引力 → 难拉伸\n```\n\n**答**：固体和液体很难被压缩，是因为分子之间存在**斥力**。当分子间距减小时，斥力急剧增大，阻止分子进一步靠近，所以很难被压缩。\n\n---\n\n## 10.2 原子的结构\n\n### 📖 核心概念",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 24,
+      "content": "```env\r\nMODEL_PROVIDER=qwen\r\nLLM_API_KEY=your_llm_api_key_here\r\nLLM_BASE_URL=your_openai_compatible_chat_base_url_here\r\nLLM_MODEL=your_chat_model_name_here\r\n\r\nEMBEDDING_PROVIDER=qwen\r\nEMBEDDING_API_KEY=your_embedding_api_key_here\r\nEMBEDDING_BASE_URL=your_openai_compatible_embedding_base_url_here\r\nEMBEDDING_MODEL=your_embedding_model_name_here\r\n\r\nDATABASE_URL=sqlite:///./data/smart_appointment.db\r\n\r\nDEBUG=True\r\nLOG_LEVEL=INFO\r\n```\r\n\r\n常见配置方向：\r\n\r\n- Qwen：使用阿里云百炼或 DashScope 的模型、Base URL 和 API Key，适合国内访问。\r\n- DeepSeek：可用于聊天模型，Embedding 可搭配其他兼容服务。\r\n- Zhipu：可配置智谱的聊天模型和向量模型。\r\n- Azure OpenAI：将 `MODEL_PROVIDER` 设置为 `azure`，并补充对应的 Azure OpenAI 环境变量。\r\n\r\n### 4. 启动服务\r\n\r\n```bash\r\npython -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload\r\n```\r\n\r\n如果 8000 端口已被占用，可以换成 8001：\r\n\r\n```bash\r\npython -m uvicorn app:app --host 127.0.0.1 --port 8001 --reload\r\n```\r\n\r\n启动后可以访问：\r\n\r\n- Web 页面：http://127.0.0.1:8000\r\n- API 文档：http://127.0.0.1:8000/docs\r\n- ReDoc 文档：http://127.0.0.1:8000/redoc\r\n\r\n## 测试\r\n\r\n运行全部测试：",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 44,
+      "content": "**控制噪声的三个途径**：\n\n```\n┌───────────────────────────────────────────────────────┐\n│                    控制噪声的三个途径                  │\n├───────────────────────────────────────────────────────┤\n│                                                       │\n│  ① 在声源处减弱          ② 在传播过程中减弱          │\n│  ┌─────────────┐         ┌─────────────┐             │\n│  │  🔇 声源    │         │  🔇 传播路径│             │\n│  │  消声器     │         │  隔音墙     │             │\n│  │  禁止鸣笛   │         │  植树造林   │             │\n│  └─────────────┘         └─────────────┘             │\n│                                                       │\n│              ③ 在人耳处减弱                          │\n│              ┌─────────────┐                         │\n│              │  👂 接收端  │                         │\n│              │  戴耳塞     │                         │\n│              │  捂耳朵     │                         │\n│              └─────────────┘                         │\n└───────────────────────────────────────────────────────┘\n```",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 13,
+      "content": "预约 Agent 负责课程预约相关流程，包括解析家长输入、匹配老师、检查老师档期、确认价格与课时、生成预约确认消息等。在家教场景里，它需要重点处理信息缺失的情况——家长常常只说“想给孩子补一下数学”，这时候系统需要主动追问年级、目标、上课时间和地点等关键信息。\r\n\r\n```text\r\n任务分类 → 解析预约需求 → 老师匹配 → 预约确认\r\n```\r\n\r\n主要职责：\r\n\r\n- 提取学员年级、学科、学习目标、期望时间、上课地点等信息\r\n- 根据学科、年级、风格偏好匹配合适的老师\r\n- 处理信息缺失时的追问\r\n- 检查老师档期冲突\r\n- 生成预约结果和上课提醒\r\n\r\n### User Behavior Agent\r\n\r\n学员行为 Agent 更偏向后台智能分析，不完全依赖家长或学员的显式请求。它会根据交互记录、预约历史、咨询内容、薄弱知识点等数据分析学员学习行为，为后续推荐提供依据。\r\n\r\n```text\r\n行为记录 → 模式分析 → 偏好更新 → 个性化推荐\r\n```\r\n\r\n主要职责：\r\n\r\n- 记录学员咨询和预约行为\r\n- 分析偏弱学科、偏好老师风格、学习时间段等模式\r\n- 生成推荐依据，例如“这位学员更适合耐心型老师”\r\n- 支持主动反馈和个性化服务\r\n\r\n附带的两个后台子模块（位于 `agents/user_behavior/`）：\r\n\r\n- **RenewalDetector**：根据套餐剩余课时（≤ 3 节）或距过期天数（< 14 天）触发续费提醒，并生成个性化续费推荐语。\r\n- **ChurnPredictor**：根据 `StudentProfile.engagement_score` 与交互间隔评估流失风险，写回 `churn_risk` 字段，供顾问主动跟进。\r\n\r\n### Trial Agent\r\n\r\n试讲 Agent 处理\"试讲预约 → 试讲反馈 → 转正式课/套餐\"这条主线，是 K12 家教场景的核心转化漏斗。\r\n\r\n```text\r\n任务分类 → 收集试讲需求(年级/学科/时段) → 创建试讲 Lesson → 课后反馈 → 推荐套餐 → 转化\r\n```\r\n\r\n主要职责：\r\n\r\n- 多轮对话补全试讲信息（学科、年级、期望时间、老师风格）\r\n- 试讲前创建 `LessonTypeEnum.TRIAL` 类型的 Lesson",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 76,
+      "content": "**解析**：\n\n**已知**：$m = 60$ kg，$S_{每只脚} = 200$ cm²，$g = 10$ N/kg\n\n**解**：\n- 人的重力：$G = mg = 60 \\times 10 = 600$ N\n- 人对地面的压力：$F = G = 600$ N\n- 总接触面积：$S = 2 \\times 200 = 400$ cm² = 0.04 m²\n\n$$p = \\frac{F}{S} = \\frac{600}{0.04} = 15000 \\text{ Pa} = 1.5 \\times 10^4 \\text{ Pa}$$\n\n**答**：人对地面的压强为 $1.5 \\times 10^4$ Pa。\n\n---\n\n## 7.2 液体压强\n\n### 📖 核心概念\n\n**液体压强的特点**：\n\n| 特点 | 说明 |\n|------|------|\n| 向各个方向 | 液体内部**向各个方向**都有压强 |\n| 深度影响 | 压强随**深度的增加**而增大 |\n| 同一深度 | 同一深度，液体向各个方向的压强**相等** |\n| 密度影响 | 不同液体的压强还与**密度**有关 |\n\n**液体压强公式**：\n\n$$p = \\rho g h$$\n\n| 符号 | 含义 | 单位 |\n|------|------|------|\n| $p$ | 液体压强 | Pa |\n| $\\rho$ | 液体密度 | kg/m³ |\n| $g$ | 重力加速度 | N/kg（约 9.8） |\n| $h$ | 深度 | m |\n\n> ⚠️ **关键**：深度 $h$ 是指从**液面**到所研究位置的**竖直距离**，不是从容器底部到液面的距离。\n\n---\n\n### 📝 例题 57：液体压强计算\n\n**题目**：一个容器中装有 0.2 m 深的水，求容器底部受到水的压强。（g = 10 N/kg）\n\n**解析**：\n\n**已知**：$h = 0.2$ m，$\\rho_{水} = 1.0 \\times 10^3$ kg/m³，$g = 10$ N/kg\n\n**解**：\n$$p = \\rho g h = 1.0 \\times 10^3 \\times 10 \\times 0.2 = 2000 \\text{ Pa}$$\n\n**答**：容器底部受到水的压强为 2000 Pa。\n\n---",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 12,
+      "content": "- Services 层调用 DB 层\r\n\r\n### 禁止的调用方式\r\n\r\n- 下层反向调用上层\r\n- Web 层绕过 API 直接访问 Services 或 DB\r\n- Agents 层绕过 Services 直接访问 DB\r\n- Services 层调用 Agents、API 或 Web\r\n\r\n## Agent 设计\r\n\r\n### Task Classification Agent\r\n\r\n任务分类 Agent 是系统的主调度器，负责分析用户输入、判断任务类型，并把请求分发给合适的专业 Agent。在家教场景下，它需要识别的是：家长是在咨询课程、咨询学科问题、预约老师、调整已有课程，还是在询问学员近期的学习表现。\r\n\r\n```text\r\n用户输入 → 意图分析 → Agent 路由 → 响应协调\r\n```\r\n\r\n主要职责：\r\n\r\n- 判断用户意图（咨询 / 预约 / 行为分析 / 其他）\r\n- 维护对话状态\r\n- 控制不同 Agent 之间的切换\r\n- 处理无法分类或超出能力范围的问题，例如明确表示不接 K12 之外的需求时礼貌回退\r\n\r\n### Consultation Agent\r\n\r\n咨询 Agent 负责学科知识问答和学习规划场景，使用 RAG 流程从知识库中检索相关内容，再结合大模型生成回答。知识库里通常会放各年级各学科的考点总结、学习方法、常见错题分析、升学政策等内容，避免大模型“自由发挥”给出不适合学员的答案。\r\n\r\n```text\r\n任务分类 → 知识检索 → FAISS 相似度搜索 → 流式回答\r\n```\r\n\r\n主要职责：\r\n\r\n- 区分咨询问题类型（学科知识 / 学习方法 / 课程介绍 / 政策信息）\r\n- 从知识库检索相关内容\r\n- 结合学员年级、学科等上下文构建提示词\r\n- 生成自然语言回答\r\n\r\n### Appointment Agent\r\n\r\n预约 Agent 负责课程预约相关流程，包括解析家长输入、匹配老师、检查老师档期、确认价格与课时、生成预约确认消息等。在家教场景里，它需要重点处理信息缺失的情况——家长常常只说“想给孩子补一下数学”，这时候系统需要主动追问年级、目标、上课时间和地点等关键信息。\r\n\r\n```text\r\n任务分类 → 解析预约需求 → 老师匹配 → 预约确认\r\n```\r\n\r\n主要职责：",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 79,
+      "content": "**核心规律**：在气体和液体中，**流速越大的位置，压强越小**。\n\n**应用与现象**：\n\n| 现象 | 解释 |\n|------|------|\n| 飞机升力 | 机翼上方空气流速大、压强小；下方流速小、压强大，产生向上的升力 |\n| 两船并行相撞 | 两船之间水流速大、压强小，外侧压强大，将两船推向中间 |\n| 草原帐篷被掀翻 | 帐篷上方风速大、压强小，下方压强大，产生向上的力 |\n\n```\n    飞机升力原理：\n    \n         流速大，压强小\n    →→→→→→→→→→→→→→→→→→→→→→→→\n    ┌─────────────────────────┐\n    │       机翼（上凸下平）    │  ← 升力方向\n    └─────────────────────────┘\n    →→→→→→→→→→→→→→→→→→→→→→→→\n         流速小，压强大\n```\n\n---\n\n### 📝 例题 61：流体压强应用\n\n**题目**：火车站台上为什么要设置安全线？乘客为什么必须站在安全线以外？\n\n**解析**：\n\n```\n    列车高速通过时：\n    \n    列车附近：流速大，压强小\n    ┌──────┐\n    │ 列车  │ →→→→\n    └──────┘\n    ←← 安全线 →→\n    \n    远离列车：流速小，压强大\n    \n    压强差 → 产生指向列车的力 → 危险！\n```\n\n**答**：当列车高速通过站台时，列车附近的空气流速大、压强小，而远离列车的地方空气流速小、压强大。如果乘客站在安全线以内，身前的空气压强小于身后的空气压强，这个压强差会产生一个指向列车的力，可能将人推向列车，造成危险。所以乘客必须站在安全线以外。\n\n---\n\n### 📝 例题 62：飞机升力\n\n**题目**：飞机的机翼为什么要设计成上凸下平的形状？\n\n**解析**：\n\n```\n    机翼形状：\n    \n         ╱╲\n        ╱  ╲\n       ╱    ╲  ← 上表面凸起，路程长\n    ──────────  ← 下表面平，路程短\n    \n    相同时间内：\n    上方空气流速 > 下方空气流速\n    上方压强 < 下方压强\n    产生向上的升力\n```",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 9,
+      "content": "# Smart Tutor Appointment AI Agent\r\n\r\nSmart Tutor Appointment AI Agent 是一个面向家教与课外辅导场景的智能预约与学习咨询系统。项目基于 FastAPI、LangChain、FAISS、SQLite 和多 Agent 协作架构，实现了意图识别、RAG 知识问答、家教老师智能匹配、课程预约管理、学员行为分析和个性化学习提醒等能力。\r\n\r\n这个项目的核心目标不是只做一个普通的课程预约表单，而是尝试把家教机构前台 / 教务老师日常需要处理的高频工作自动化：理解家长或学员是在咨询课程、预约老师，还是反馈学习情况，判断学科、年级与学习偏好，匹配合适的家教老师，检查可用时间，生成预约结果，并在必要时结合天气、历史学习行为和偏好数据给出更贴近学员实际情况的提醒与推荐。\r\n\r\n## 项目背景\r\n\r\n在一次和家教机构负责人的交流中，我注意到教务前台每天都要同时处理大量复杂事务：老师排班、学员预约、课程咨询、价格计算、临时调课、老师偏好记录和续费确认等。随着老师数量和学员量增加，传统人工前台模式很容易出现沟通成本高、信息遗漏、排课冲突和学习体验不稳定的问题。\r\n\r\n而且在家教这个场景里，用户咨询的内容往往非常专业——不同年级、不同学科的考点、学习方法、适合的教材、考前冲刺策略等，这些都很难靠一句模板回答解决；同时，学员的个体差异非常大，小学三年级数学基础薄弱和高二物理冲刺的需求完全不同，需要系统能够记录并理解这些差异。\r\n\r\n因此，本项目尝试用 AI Agent 的方式重构这一流程：让系统能够像一个智能教务前台一样主动理解家长和学员的需求，并把不同任务分发给对应的专业 Agent 处理。它既适用于 K12 一对一上门家教，也可以扩展到语言培训、考研辅导、留学规划和兴趣班等需要老师排班、课程预约和智能客服的教育服务行业。\r\n\r\n## 核心能力\r\n\r\n- **智能任务分类**：自动识别用户是在咨询课程、预约老师、查询学习问题，还是触发学习行为分析，并将请求路由到对应 Agent。\r\n- **多 Agent 协作**：通过任务分类 Agent、咨询 Agent、试讲 Agent、正式课 Agent、学员行为 Agent、续费/流失分析子模块分工处理复杂流程，减少单个模块的职责膨胀。",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 65,
+      "content": "**答**：剩余部分的密度仍然是 $7.9 \\times 10^3$ kg/m³。\n\n---\n\n### 📝 例题 38：密度公式应用\n\n**题目**：一个铝球的质量是 162 g，体积是 60 cm³，这个铝球是实心的还是空心的？（铝的密度 = 2.7 g/cm³）\n\n**解析**：\n\n**方法一：比较质量**\n- 实心铝球的质量：$m_{实} = \\rho V = 2.7 \\times 60 = 162$ g\n- 铝球实际质量 = 162 g\n- 因为 $m_{实} = m_{球}$，所以这个铝球是**实心的**\n\n**方法二：比较体积**\n- 实心铝球的体积：$V_{实} = \\frac{m}{\\rho} = \\frac{162}{2.7} = 60$ cm³\n- 铝球实际体积 = 60 cm³\n- 因为 $V_{实} = V_{球}$，所以这个铝球是**实心的**\n\n**答**：这个铝球是**实心的**。\n\n---\n\n## 4.4 密度的应用\n\n### 📖 核心概念\n\n**密度公式的变形应用**：\n\n| 公式 | 用途 |\n|------|------|\n| $\\rho = \\frac{m}{V}$ | 求密度 |\n| $m = \\rho V$ | 求质量 |\n| $V = \\frac{m}{\\rho}$ | 求体积 |\n\n**常见应用**：\n1. 鉴别物质（密度是物质的特性）\n2. 计算不便直接测量的质量或体积\n3. 判断物体是否空心\n\n---\n\n### 📝 例题 39：密度鉴别物质\n\n**题目**：一个铜球的体积是 20 cm³，质量是 178 g，这个铜球是实心的还是空心的？（铜的密度 = 8.9 g/cm³）\n\n**解析**：\n\n**解**：\n- 实心铜球的质量：$m_{实} = \\rho V = 8.9 \\times 20 = 178$ g\n- 铜球实际质量 = 178 g\n- 因为 $m_{实} = m_{球}$，所以这个铜球是**实心的**\n\n如果铜球质量小于 178 g（如 150 g），则为空心，空心部分体积 = $V_{球} - \\frac{m_{球}}{\\rho} = 20 - \\frac{150}{8.9} ≈ 3.15$ cm³\n\n**答**：这个铜球是**实心的**。\n\n---\n\n### 📝 例题 40：密度综合应用",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 18,
+      "content": "│   │   ├── schedule_generator.py        # 周固定系列课展开\r\n│   │   ├── conflict_detector.py         # 老师时段冲突检测\r\n│   │   ├── reschedule_handler.py        # 调课\r\n│   │   └── cancel_handler.py            # 退课\r\n│   ├── user_behavior_agent.py           # 学员行为分析 Agent\r\n│   ├── consultant/                      # 知识检索、提示词、回答生成\r\n│   │   ├── consultation_processor.py\r\n│   │   ├── consultation_classifier.py\r\n│   │   ├── knowledge_retriever.py\r\n│   │   ├── prompt_builder.py\r\n│   │   └── response_generator.py\r\n│   ├── task_classification/             # 意图识别、状态管理、路由逻辑\r\n│   │   ├── task_classifier.py\r\n│   │   ├── state_manager.py\r\n│   │   ├── agent_router.py\r\n│   │   ├── classification_processor.py\r\n│   │   └── unrelated_handler.py\r\n│   └── user_behavior/                   # 行为记录、偏好管理、模式分析\r\n│       ├── behavior_recorder.py\r\n│       ├── preference_manager.py\r\n│       ├── pattern_analyzer.py\r\n│       ├── renewal_detector.py          # 续费信号\r\n│       └── churn_predictor.py           # 流失风险",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 74,
+      "content": "---\n\n### 📝 例题 53：二力平衡判断\n\n**题目**：一本书放在水平桌面上，处于静止状态。下列哪对力是平衡力？  \nA. 书的重力和书对桌面的压力  \nB. 书的重力和桌面对书的支持力  \nC. 书对桌面的压力和桌面对书的支持力\n\n**解析**：\n\n| 选项 | 分析 | 判断 |\n|------|------|------|\n| A | 重力作用在书上，压力作用在桌面上，不同物体 | ✗ |\n| B | 都作用在书上，等大、反向、共线 | ✓ |\n| C | 分别作用在桌面和书上，不同物体（相互作用力） | ✗ |\n\n**答**：选 **B**。\n\n---\n\n### 📝 例题 54：平衡力与运动状态\n\n**题目**：一个物体受到两个力的作用，如果这两个力的大小相等、方向相反、作用在同一直线上，这个物体一定处于平衡状态吗？\n\n**解析**：\n\n**不一定**！还需要满足一个条件：两个力必须作用在**同一物体**上。\n\n```\n    情况一：两个力作用在同一物体上 → 平衡状态 ✓\n    \n    ←── F1 ──┤ 物体 ├── F2 ──→\n    \n    情况二：两个力作用在不同物体上 → 不是平衡力 ✗\n    \n    ←── F1 ──┤ 物体A │ 物体B ├── F2 ──→\n```\n\n**答**：不一定。两个力必须同时满足四个条件才是平衡力：① 作用在同一物体上；② 大小相等；③ 方向相反；④ 作用在同一直线上。如果两个力分别作用在两个不同的物体上，即使大小相等、方向相反、在同一直线上，也不是平衡力。\n\n---\n\n# 📗 第七章 压强\n\n---\n\n## 7.1 压强\n\n### 📖 核心概念\n\n**压强**：物体所受**压力的大小**与**受力面积**之比叫做压强。\n\n**公式**：\n\n$$p = \\frac{F}{S}$$\n\n| 符号 | 含义 | 单位 |\n|------|------|------|\n| $p$ | 压强 | Pa（帕斯卡） |\n| $F$ | 压力 | N |\n| $S$ | 受力面积 | m² |\n\n**压强的单位**：**帕斯卡（Pa）**，1 Pa = 1 N/m²\n\n> 💡 **压强的物理意义**：压强表示压力的作用效果。压强越大，压力的作用效果越明显。\n\n**增大和减小压强的方法**：",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 10,
+      "content": "## 核心能力\r\n\r\n- **智能任务分类**：自动识别用户是在咨询课程、预约老师、查询学习问题，还是触发学习行为分析，并将请求路由到对应 Agent。\r\n- **多 Agent 协作**：通过任务分类 Agent、咨询 Agent、试讲 Agent、正式课 Agent、学员行为 Agent、续费/流失分析子模块分工处理复杂流程，减少单个模块的职责膨胀。\r\n- **RAG 知识咨询**：使用 FAISS 向量索引检索学科知识库、课程介绍、学习方法等内容，结合大模型生成自然语言回答，支持流式输出，适合家长在课前课后随时提问。\r\n- **试讲 → 转化漏斗**：独立 TrialAgent 负责试讲前的需求收集与信息追问；试讲结束后收集 1-5 星反馈、是否继续上课和补充学科，自动推荐适合的套餐并可一键转为正式课或系列课。\r\n- **正式课与系列课**：支持单次试讲 / 单次正式课 / 周固定系列课 / 补课四种课时类型；周固定系列课由 `LessonSeries` 按 `weekly_pattern` 自动展开为多节具体 `Lesson`，并支持调课、退课、冲突检测。\r\n- **老师匹配**：综合学科、年级、教学风格、家长预算、历史评分、价格适配系数对候选老师打分（见 `RecommendationService.score_teacher_for_student`），支持家长中心主动推荐与 Agent 自动调用。\r\n- **学员行为分析**：记录学员的咨询内容、上课记录、薄弱知识点和兴趣偏好，分析学习模式，并用于后续推荐和个性化反馈。\r\n- **续费与流失预警**：`RenewalDetector` 在套餐剩余 ≤ 3 课时或有效期不足 14 天时触发续费提醒；`ChurnPredictor` 根据 `engagement_score` 评估流失风险。\r\n- **个性化提醒**：在课程预约完成后，可结合实时天气、近期考试节点等外部信息生成更贴近实际场景的上课提醒，例如“明天降温，记得让孩子带件外套”。\r\n- **Embedding 缓存优化**：通过数据库缓存和文件缓存减少重复向量计算，提高知识检索性能。\r\n- **数据管理能力**：支持学科知识库、老师信息、学员档案、套餐和学习进度的增删改查，并在数据变化后自动维护索引。",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 88,
+      "content": "**题目**：用滑轮组将重 400 N 的物体匀速提升 2 m，拉力为 150 N，绳子自由端移动 6 m。求：(1) 绳子股数 n (2) 动滑轮重力（不计摩擦）\n\n**解析**：\n\n**解**：\n(1) 绳子股数：$n = \\frac{s}{h} = \\frac{6}{2} = 3$\n\n(2) 不计摩擦时：$F = \\frac{G_{物} + G_{动}}{n}$\n\n$$G_{动} = nF - G_{物} = 3 \\times 150 - 400 = 450 - 400 = 50 \\text{ N}$$\n\n**答**：(1) 绳子股数 n = 3；(2) 动滑轮重力为 50 N。\n\n---\n\n## 9.3 功与功率\n\n### 📖 核心概念\n\n**功**：当一个力作用在物体上，物体在这个力的方向上移动了一段距离，就说这个力对物体做了功。\n\n**功的计算**：\n\n$$W = Fs$$\n\n**功的两个必要因素**：\n1. 作用在物体上的**力**\n2. 物体在力的**方向上**通过的距离\n\n> ⚠️ **不做功的三种情况**：\n> - 有力无距离（如推墙没推动）\n> - 有距离无力（如冰面上滑行）\n> - 力与距离垂直（如提着水桶水平行走）\n\n**功率**：表示做功**快慢**的物理量。\n\n**公式**：\n\n$$P = \\frac{W}{t} = Fv$$\n\n**功率的单位**：**瓦特（W）**，1 W = 1 J/s\n\n---\n\n### 📝 例题 73：功的计算\n\n**题目**：一台起重机在 10 s 内将 2 t 的货物匀速提升 5 m，求起重机做的功。（g = 10 N/kg）\n\n**解析**：\n\n**已知**：$m = 2 \\text{ t} = 2000$ kg，$t = 10$ s，$h = 5$ m\n\n**解**：\n- 货物重力：$G = mg = 2000 \\times 10 = 20000$ N\n- 起重机匀速提升货物，拉力 $F = G = 20000$ N\n- 做的功：$W = Fs = Gh = 20000 \\times 5 = 100000$ J\n\n**答**：起重机做的功为 100000 J（100 kJ）。\n\n---\n\n### 📝 例题 74：功率计算\n\n**题目**：接上题，起重机做功的功率是多少？\n\n**解析**：",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 26,
+      "content": "启动服务后，可以按下面的剧本向聊天接口（`POST /chat/stream`）依次输入，观察任务分类 → Agent 路由 → 业务执行 → 数据库落库的完整链路：\r\n\r\n1. **咨询** — 输入\"初二数学函数基础不好怎么办？\" → TaskClassificationAgent 路由到 ConsultantAgent → RAG 检索 → 流式输出学习建议\r\n2. **试讲** — 输入\"想给孩子约一次数学试讲\" → TrialAgent 多轮追问学科/年级/时段 → 创建 `LessonTypeEnum.TRIAL` 课时\r\n3. **老师筛选** — 输入\"有没有耐心点的女老师\" → RecommendationService 按 `gender / style / subject` 打分返回 Top-N\r\n4. **正式课排课** — 输入\"每周三晚上 7 点\" → LessonAgent → ScheduleGenerator 展开为系列课 → ConflictDetector 校验\r\n5. **课后反馈** — 调用 `POST /api/trial/{lesson_id}/feedback` 提交 5 星 + would_continue=true → ConversionLogic 推荐套餐\r\n6. **续费/流失预警** — 后台 `RenewalDetector` + `ChurnPredictor` 异步检测，写回 `UserRecommendation` 表\r\n\r\n> 完整的 API 列表（按模块分组）见 `docs/TUTOR_DESIGN.md §10`，本文不重复列全部 endpoint。\r\n\r\n**一键端到端演示**：启动服务后，在 `.venv` 中运行\r\n\r\n```powershell\r\npython scripts/demo_e2e.py http://127.0.0.1:8001\r\n```\r\n\r\n脚本会按 1)看老师 → 2)看套餐 → 3)建学员 → 4)预约试讲 → 5)生成周固定系列课 → 6)提交反馈 → 7)查行为分析 → 8)写课后进度 顺序跑一遍，输出每步 HTTP 状态，验证家长视角完整链路。\r\n\r\n## 后续规划\r\n\r\n### 更强的 Agent 自主能力",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 71,
+      "content": "---\n\n### 📝 例题 48：摩擦力方向判断\n\n**题目**：人走路时，脚受到的摩擦力方向是向前还是向后？\n\n**解析**：\n\n```\n    人走路时脚的受力分析：\n    \n    👤 人向前走\n    \n    脚向后蹬地 → 地面对脚的摩擦力向前\n    \n    脚有向后运动的趋势\n    摩擦力方向：向前（阻碍向后运动的趋势）\n```\n\n**答**：人走路时，脚向后蹬地，脚有向后运动的趋势，地面对脚的摩擦力方向**向前**。正是这个向前的摩擦力推动人前进。\n\n---\n\n# 📗 第六章 力与运动\n\n---\n\n## 6.1 牛顿第一定律\n\n### 📖 核心概念\n\n**牛顿第一定律（惯性定律）**：一切物体在没有受到力的作用时，总保持**静止状态**或**匀速直线运动状态**。\n\n> ⚠️ **注意**：\n> - 牛顿第一定律不能直接用实验证明（无法创造\"不受力\"的条件）\n> - 它是在大量实验基础上通过**推理概括**得出的\n> - 力不是维持物体运动的原因，而是**改变物体运动状态**的原因\n\n**伽利略斜面实验**：\n\n```\n    表面越光滑 → 阻力越小 → 速度减小得越慢 → 运动距离越远\n    \n    毛巾表面：      棉布表面：      木板表面：      理想表面（无阻力）：\n    ━━━━━━━        ─────────       ─────────       ─────────\n    🚗 → 短        🚗 →→ 中        🚗 →→→ 长      🚗 →→→→→→ 永远运动\n```\n\n---\n\n### 📝 例题 49：牛顿第一定律\n\n**题目**：正在运动的物体，如果它受到的所有力同时消失，它将怎样运动？\n\n**解析**：\n\n- 根据牛顿第一定律\n- 物体不受力时，保持原来的运动状态\n- 原来是运动的 → 继续做匀速直线运动\n\n**答**：物体受到的所有力同时消失后，物体将保持**匀速直线运动状态**，即以原来的速度做匀速直线运动。\n\n---\n\n### 📝 例题 50：力与运动的关系\n\n**题目**：下列说法正确的是（  ）  \nA. 物体不受力就不能运动  \nB. 物体受力才能运动  \nC. 力是维持物体运动的原因  \nD. 力是改变物体运动状态的原因\n\n**解析**：",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 16,
+      "content": "### 5 层结构概览\r\n\r\n```text\r\nWeb & Application Layer   app.py, web/routes.py\r\n    ↓\r\nAPI Layer                  api/ (orchestration, REST + chat)\r\n    ↓\r\nAgents Layer               agents/ (TaskClassification → Consultant/Trial/Lesson/UserBehavior)\r\n    ↓\r\nServices Layer             services/ (teacher / lesson / package / progress / knowledge / recommendation)\r\n    ↓\r\nDB Layer                   db/ (SQLAlchemy models + Repository 模式)\r\n```\r\n\r\n调用方向是**单向**: 下层不能反向调用上层。 当前唯一例外是 `services/lesson_service.py` 在函数体内 lazy import `agents.lesson.ScheduleGenerator`,见 `docs/REPO_HEALTH.md` T2。\r\n\r\n## 技术栈\r\n\r\n- **后端框架**：FastAPI、Uvicorn\r\n- **AI 框架**：LangChain\r\n- **大模型接入**：兼容 OpenAI 格式的模型提供商，例如 Qwen、DeepSeek、Zhipu、OpenAI、Azure OpenAI\r\n- **向量检索**：FAISS\r\n- **数据库**：SQLite、SQLAlchemy\r\n- **RAG 能力**：Embedding、向量索引、知识库检索、提示词构建\r\n- **流式响应**：Python AsyncGenerator\r\n- **前端页面**：Jinja2 模板、静态 CSS\r\n- **外部服务扩展**：MCP，用于天气、节假日等外部信息接入\r\n- **配置管理**：python-dotenv\r\n- **后台任务**：schedule\r\n\r\n## 项目结构\r\n\r\n```text",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 94,
+      "content": "**题目**：原子核由什么粒子组成？这些粒子各带什么电？\n\n**解析**：\n\n```\n    原子核组成：\n    \n    原子核\n    ├── 质子（带正电）\n    └── 中子（不带电）\n```\n\n**答**：原子核由**质子**和**中子**组成。质子带**正电**，中子**不带电**。\n\n---\n\n## 10.3 宇宙概观\n\n### 📖 核心概念\n\n**太阳系的组成**：\n\n| 天体 | 特点 |\n|------|------|\n| **太阳** | 太阳系的中心，恒星 |\n| **行星** | 围绕太阳运动（水、金、地、火、木、土、天王、海王） |\n| **卫星** | 围绕行星运动（如月球绕地球） |\n| **小行星** | 大量小天体集中在火星和木星之间 |\n| **彗星** | 绕太阳运动的冰冻天体（如哈雷彗星） |\n\n**宇宙的尺度**：\n\n```\n    宇宙结构：\n    \n    宇宙\n     └── 银河系\n          └── 太阳系\n               ├── 太阳（恒星）\n               ├── 行星（地球等）\n               │    └── 卫星（月球等）\n               ├── 小行星带\n               └── 彗星\n```\n\n**地球的特殊性**：\n- 与太阳的距离适中 → 温度适宜\n- 有液态水存在\n- 有大气层保护\n\n---\n\n### 📝 例题 83：宇宙结构\n\n**题目**：地球在太阳系中的位置有什么特殊性？这与地球上存在生命有什么关系？\n\n**解析**：\n\n| 特殊性 | 与生命的关系 |\n|--------|-------------|\n| 与太阳距离适中 | 温度适宜（0~100°C） |\n| 有液态水 | 生命存在的重要条件 |\n| 有大气层保护 | 阻挡有害辐射 |\n\n**答**：地球在太阳系中的位置特殊性在于：地球与太阳的距离适中（第三颗行星）。这使得地球表面温度适宜，水能以液态形式存在。液态水是生命存在的重要条件。此外，地球有大气层保护，能阻挡有害辐射，也为生命存在提供了条件。\n\n---\n\n### 📝 例题 84：天体运动\n\n**题目**：月球围绕什么天体运动？月球是恒星还是行星还是卫星？\n\n**解析**：",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 22,
+      "content": "├── web/                                 # Web 页面层\r\n│   ├── routes.py                        # 页面路由\r\n│   ├── templates/                       # HTML 模板（11 个页面）\r\n│   │   ├── index.html                   # 聊天入口\r\n│   │   ├── teacher_list.html / teacher_detail.html\r\n│   │   ├── packages.html\r\n│   │   ├── schedule_calendar.html / lesson_series.html\r\n│   │   ├── progress_dashboard.html\r\n│   │   ├── student_profile.html / parent_center.html\r\n│   │   ├── knowledge_management.html\r\n│   │   └── user_behavior_analysis.html\r\n│   └── static/styles.css                # 全站样式\r\n├── docs/\r\n│   └── TUTOR_DESIGN.md                  # 详细业务模型与数据流设计\r\n├── tests/                               # 单元测试（核心算法）\r\n│   ├── test_schedule_generator.py\r\n│   ├── test_conflict_detector.py\r\n│   ├── test_cancel_handler.py\r\n│   ├── test_conversion_logic.py\r\n│   └── test_renewal_detector.py\r\n├── data/                                # SQLite 数据库与 FAISS 索引\r\n├── app.py                               # 应用入口",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 53,
+      "content": "**解**：\n- 根据反射定律：反射角 = 入射角 = **30°**\n- 反射光线与入射光线的夹角 = ∠i + ∠r = 30° + 30° = **60°**\n\n**答**：反射角是 30°，反射光线与入射光线的夹角是 60°。\n\n---\n\n### 📝 例题 22：镜面反射与漫反射\n\n**题目**：我们能从不同方向看到黑板上的字，是镜面反射还是漫反射？黑板反光（\"晃眼\"）又是什么原因？\n\n**解析**：\n\n| 情况 | 反射类型 | 原因 |\n|------|----------|------|\n| 能从不同方向看到字 | 漫反射 | 黑板表面粗糙，反射光射向各个方向 |\n| 黑板反光（晃眼） | 镜面反射 | 黑板某些区域过于光滑，反射光集中射向某个方向 |\n\n**答**：我们能从不同方向看到黑板上的字，是因为光在黑板表面发生了**漫反射**。黑板反光是因为黑板某些区域过于光滑，发生了**镜面反射**，反射光集中射向某个方向，在该方向上的人感到特别刺眼。\n\n---\n\n## 3.3 平面镜成像\n\n### 📖 核心概念\n\n**平面镜成像特点**（四个关键词：等大、等距、正立、虚像）：\n\n| 特点 | 说明 |\n|------|------|\n| 像与物**大小相等** | 像与物等大 |\n| 像与物到镜面的距离**相等** | 像距 = 物距 |\n| 像与物的连线与镜面**垂直** | 对称关系 |\n| 所成的像是**虚像** | 不能用光屏承接 |\n\n```\n    平面镜成像示意图：\n    \n           镜面\n            |\n    👤 ←2m→ | ←2m→ 👤'\n    人(物)   |    像\n            \n    像与物关于镜面对称\n    像距 = 物距 = 2m\n    像与物之间距离 = 4m\n```\n\n**实像与虚像**：\n\n| 类型 | 形成方式 | 能否用光屏承接 | 举例 |\n|------|----------|--------------|------|\n| **实像** | 实际光线会聚而成 | ✅ 能 | 小孔成像、凸透镜成像 |\n| **虚像** | 光线的反向延长线相交 | ❌ 不能 | 平面镜成像 |\n\n---\n\n### 📝 例题 23：平面镜成像特点",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 17,
+      "content": "- **流式响应**：Python AsyncGenerator\r\n- **前端页面**：Jinja2 模板、静态 CSS\r\n- **外部服务扩展**：MCP，用于天气、节假日等外部信息接入\r\n- **配置管理**：python-dotenv\r\n- **后台任务**：schedule\r\n\r\n## 项目结构\r\n\r\n```text\r\nSmart Tutor Appointment AI Agent/\r\n├── agents/                              # 多 Agent 智能层\r\n│   ├── task_classification_agent.py     # 任务分类与主路由\r\n│   ├── consultant_agent.py              # RAG 咨询 Agent\r\n│   ├── trial/                           # 试讲预约/反馈/转化\r\n│   │   ├── trial_agent.py               # 试讲主控制器\r\n│   │   ├── trial_processor.py           # 试讲对话处理器\r\n│   │   ├── trial_feedback.py            # 试讲反馈收集\r\n│   │   └── conversion_logic.py          # 试讲转套餐决策\r\n│   ├── lesson/                          # 正式课与系列课\r\n│   │   ├── lesson_agent.py              # 正式课主控制器\r\n│   │   ├── lesson_processor.py\r\n│   │   ├── schedule_generator.py        # 周固定系列课展开\r\n│   │   ├── conflict_detector.py         # 老师时段冲突检测\r\n│   │   ├── reschedule_handler.py        # 调课\r\n│   │   └── cancel_handler.py            # 退课",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 61,
+      "content": "| 物体颜色 | 反射/透过情况 |\n|----------|--------------|\n| 白色物体 | 反射所有色光 |\n| 黑色物体 | 吸收所有色光 |\n| 红色物体 | 只反射红光，吸收其他色光 |\n\n**红外线与紫外线**：\n\n| 类型 | 特点 | 应用 |\n|------|------|------|\n| **红外线** | 热效应强 | 电视遥控器、红外夜视仪 |\n| **紫外线** | 能使荧光物质发光 | 验钞、消毒杀菌 |\n\n---\n\n### 📝 例题 31：光的色散\n\n**题目**：在阳光下，一件白上衣和一件红上衣，哪件看起来更亮？为什么在红光下白上衣也呈红色？\n\n**解析**：\n\n| 情况 | 白上衣 | 红上衣 |\n|------|--------|--------|\n| 阳光下 | 反射所有色光 → 更亮 | 只反射红光 |\n| 红光下 | 反射红光 → 呈红色 | 反射红光 → 呈红色 |\n\n**答**：在阳光下**白上衣**更亮。因为白上衣反射所有色光，红上衣只反射红光。在红光下，白上衣和红上衣都只反射红光，所以都呈红色。\n\n---\n\n### 📝 例题 32：红外线与紫外线\n\n**题目**：电视遥控器是利用什么线工作的？验钞机是利用什么线工作的？各利用了它们的什么特性？\n\n**解析**：\n\n| 应用 | 使用的光 | 利用的特性 |\n|------|----------|------------|\n| 电视遥控器 | 红外线 | 红外线可以传递信号（热效应） |\n| 验钞机 | 紫外线 | 紫外线能使荧光物质发光 |\n\n**答**：电视遥控器利用**红外线**工作，利用了红外线可以传递信号的特性；验钞机利用**紫外线**工作，利用了紫外线能使荧光物质发光的特性。\n\n---\n\n# 📗 第四章 质量与密度\n\n---\n\n## 4.1 质量\n\n### 📖 核心概念\n\n**质量**：物体所含**物质的多少**叫做质量，用 $m$ 表示。\n\n**单位**：\n\n| 单位 | 符号 | 换算关系 |\n|------|------|----------|\n| 吨 | t | 1 t = 1000 kg |\n| 千克 | kg | 1 kg = 1000 g |\n| 克 | g | 1 g = 1000 mg |",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 25,
+      "content": "```\r\n\r\n启动后可以访问：\r\n\r\n- Web 页面：http://127.0.0.1:8000\r\n- API 文档：http://127.0.0.1:8000/docs\r\n- ReDoc 文档：http://127.0.0.1:8000/redoc\r\n\r\n## 测试\r\n\r\n运行全部测试：\r\n\r\n```bash\r\npytest\r\n```\r\n\r\n运行单个测试文件：\r\n\r\n```bash\r\npytest tests/test_task_classification_agent.py\r\n```\r\n\r\n## 主要页面\r\n\r\n| 路径 | 说明 |\r\n|---|---|\r\n| `/` | 首页：聊天入口，集成任务分类、咨询、试讲、正式课的统一对话界面 |\r\n| `/teachers` | 老师库列表，支持按学科 / 年级筛选 |\r\n| `/teachers/{id}` | 老师详情页 + 预约试讲 |\r\n| `/packages` | 课时套餐列表与购买 |\r\n| `/schedule-calendar` | 排课日历视图 |\r\n| `/lesson-series` | 周固定系列课列表（已排课 / 已完成 / 暂停） |\r\n| `/progress-dashboard` | 学员学习进度看板（按学科展示掌握度与薄弱点） |\r\n| `/student-profile` | 学生档案（年级、薄弱学科、学习目标、风格偏好、活跃度、流失风险） |\r\n| `/parent-center` | 家长中心：续费提醒、流失预警、推荐汇总 |\r\n| `/knowledge` | 学科知识库管理（增删改查 + 关键词检索） |\r\n| `/user_behavior_analysis` | 学员行为分析看板 |\r\n\r\n## 演示流程（端到端）\r\n\r\n启动服务后，可以按下面的剧本向聊天接口（`POST /chat/stream`）依次输入，观察任务分类 → Agent 路由 → 业务执行 → 数据库落库的完整链路：\r\n\r\n1. **咨询** — 输入\"初二数学函数基础不好怎么办？\" → TaskClassificationAgent 路由到 ConsultantAgent → RAG 检索 → 流式输出学习建议",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 69,
+      "content": "---\n\n## 5.3 弹力与弹簧测力计\n\n### 📖 核心概念\n\n**弹性形变**：物体受力发生形变，撤去力后能恢复原状的形变。\n\n**弹力**：物体发生弹性形变时产生的力。\n\n> 💡 **弹力产生的条件**：① 两个物体直接接触 ② 发生弹性形变\n\n**弹簧测力计**：\n\n| 项目 | 内容 |\n|------|------|\n| **原理** | 在弹性限度内，弹簧的伸长量与所受拉力成**正比** |\n| **使用方法** | 一看（量程和分度值）、二调（调零）、三测（沿轴线方向拉）、四读（视线与刻度面垂直） |\n\n---\n\n### 📝 例题 45：弹簧测力计原理\n\n**题目**：弹簧测力计的原理是什么？使用前要注意什么？\n\n**解析**：\n\n**原理**：在弹性限度内，弹簧的伸长量与所受的拉力成**正比**\n\n**使用注意事项**：\n1. 观察量程和分度值\n2. 检查指针是否指在零刻度线上，若不在要调零\n3. 测量时拉力方向要沿弹簧轴线方向\n4. 不能超过量程使用\n\n**答**：原理：在弹性限度内，弹簧的伸长量与所受的拉力成正比。使用前要注意：① 观察量程和分度值；② 检查指针是否指在零刻度线上，若不在要调零；③ 测量时拉力方向要沿弹簧轴线方向；④ 不能超过量程使用。\n\n---\n\n### 📝 例题 46：弹力判断\n\n**题目**：下列物体受力后产生的力属于弹力的是（  ）  \nA. 重力  \nB. 压力  \nC. 摩擦力  \nD. 支持力\n\n**解析**：\n\n| 选项 | 力的类型 | 是否弹力 |\n|------|----------|----------|\n| A. 重力 | 万有引力 | ✗ |\n| B. 压力 | 物体形变产生 | ✓ |\n| C. 摩擦力 | 接触面粗糙 | ✗ |\n| D. 支持力 | 物体形变产生 | ✓ |\n\n**答**：选 **B 和 D**。压力和支持力都是物体发生弹性形变时产生的力，属于弹力。\n\n---\n\n## 5.4 摩擦力\n\n### 📖 核心概念\n\n**摩擦力**：两个相互接触的物体，当它们发生**相对运动**或有**相对运动趋势**时，在接触面上产生的阻碍相对运动（或相对运动趋势）的力。\n\n**摩擦力的种类**：静摩擦力、滑动摩擦力、滚动摩擦力\n\n**影响滑动摩擦力大小的因素**：",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 11,
+      "content": "- **个性化提醒**：在课程预约完成后，可结合实时天气、近期考试节点等外部信息生成更贴近实际场景的上课提醒，例如“明天降温，记得让孩子带件外套”。\r\n- **Embedding 缓存优化**：通过数据库缓存和文件缓存减少重复向量计算，提高知识检索性能。\r\n- **数据管理能力**：支持学科知识库、老师信息、学员档案、套餐和学习进度的增删改查，并在数据变化后自动维护索引。\r\n- **日志与兜底机制**：保留关键处理过程日志，在信息不足或异常情况下提供更稳定的降级处理，例如自动追问年级或学科信息。\r\n\r\n> 详细业务模型、数据流与扩展规划见 [`docs/TUTOR_DESIGN.md`](./docs/TUTOR_DESIGN.md)。\r\n\r\n## 系统架构\r\n\r\n项目采用严格的五层架构，核心原则是：**下层不能反向调用上层**。这样可以避免循环依赖，让业务逻辑、数据访问和接口编排保持清晰边界。\r\n\r\n```text\r\nWeb & Application Layer\r\n    ↓  app.py, web/：页面、路由入口、系统启动\r\nAPI Layer\r\n    ↓  api/：外部接口、请求编排、响应封装\r\nAgents Layer\r\n    ↓  agents/：AI Agent、任务路由、对话流程控制\r\nServices Layer\r\n    ↓  services/：业务逻辑、推荐算法、向量处理\r\nDB Layer\r\n    ↓  db/：数据模型、数据库连接、Repository\r\n```\r\n\r\n### 允许的调用方向\r\n\r\n- Web 层调用 API 层\r\n- API 层调用 Agents 层或 Services 层\r\n- Agents 层调用 Services 层\r\n- Services 层调用 DB 层\r\n\r\n### 禁止的调用方式\r\n\r\n- 下层反向调用上层\r\n- Web 层绕过 API 直接访问 Services 或 DB\r\n- Agents 层绕过 Services 直接访问 DB\r\n- Services 层调用 Agents、API 或 Web\r\n\r\n## Agent 设计\r\n\r\n### Task Classification Agent",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 72,
+      "content": "**答**：物体受到的所有力同时消失后，物体将保持**匀速直线运动状态**，即以原来的速度做匀速直线运动。\n\n---\n\n### 📝 例题 50：力与运动的关系\n\n**题目**：下列说法正确的是（  ）  \nA. 物体不受力就不能运动  \nB. 物体受力才能运动  \nC. 力是维持物体运动的原因  \nD. 力是改变物体运动状态的原因\n\n**解析**：\n\n| 选项 | 分析 | 判断 |\n|------|------|------|\n| A | 物体不受力可以保持匀速直线运动 | ✗ |\n| B | 物体不受力也能保持运动状态 | ✗ |\n| C | 力不是维持运动的原因，惯性才是 | ✗ |\n| D | 力是改变物体运动状态的原因 | ✓ |\n\n**答**：选 **D**。力是改变物体运动状态的原因，不是维持物体运动的原因。\n\n---\n\n## 6.2 惯性\n\n### 📖 核心概念\n\n**惯性**：物体保持**原来运动状态不变**的性质叫做惯性。\n\n**惯性的特点**：\n\n| 特点 | 说明 |\n|------|------|\n| 普遍性 | 一切物体都具有惯性（不论静止还是运动） |\n| 固有属性 | 惯性是物体的固有属性，只与**质量**有关 |\n| 量度 | 质量越大，惯性越大 |\n| ⚠️ 易错 | 惯性不是力，不能说\"受到惯性\"或\"惯性力\" |\n\n---\n\n### 📝 例题 51：惯性现象\n\n**题目**：汽车紧急刹车时，乘客为什么会向前倾倒？这与质量有关吗？\n\n**解析**：\n\n```\n    刹车前：                刹车后：\n    \n    🚗→→→ 🧑→→→           🚗××× 🧑→→→→\n    汽车和乘客一起向前运动   汽车停止，乘客由于惯性继续向前运动\n```\n\n**答**：汽车刹车前，乘客与汽车一起向前运动。紧急刹车时，汽车突然停止，但乘客由于**惯性**，仍要保持原来的运动状态继续向前运动，所以会向前倾倒。惯性的大小只与质量有关，质量越大惯性越大。\n\n---\n\n### 📝 例题 52：惯性的应用与防范\n\n**题目**：下列哪些是利用惯性的例子？哪些是防范惯性的例子？  \n(1) 跳远助跑  \n(2) 系安全带  \n(3) 拍打衣服上的灰尘  \n(4) 汽车限速\n\n**解析**：",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
+    },
+    {
+      "doc_id": 14,
+      "content": "```text\r\n任务分类 → 收集试讲需求(年级/学科/时段) → 创建试讲 Lesson → 课后反馈 → 推荐套餐 → 转化\r\n```\r\n\r\n主要职责：\r\n\r\n- 多轮对话补全试讲信息（学科、年级、期望时间、老师风格）\r\n- 试讲前创建 `LessonTypeEnum.TRIAL` 类型的 Lesson\r\n- 收集 1-5 星评分、是否继续、补充学科等 `TrialFeedback`\r\n- 根据反馈与学员画像通过 `ConversionLogic` 推荐匹配的 CoursePackage\r\n- 一键调用 `/api/trial/{lesson_id}/convert` 转为正式课或周固定系列课\r\n\r\n### Lesson Agent\r\n\r\n正式课 Agent（`agents/lesson/`）负责单次正式课与周固定系列课的完整生命周期。\r\n\r\n```text\r\n任务分类 → 收集上课需求 → ScheduleGenerator 排课 → ConflictDetector 冲突检测\r\n        → RescheduleHandler 调课 → CancelHandler 退课 → 课后 ProgressRecord\r\n```\r\n\r\n主要职责：\r\n\r\n- 单次课排课：补全学科 / 年级 / 时段 / 老师偏好等字段\r\n- 周固定系列课生成：根据 `weekly_pattern` 与 `validity_days` 自动展开多节 Lesson\r\n- 冲突检测：避免同一老师同一时段被重复排课\r\n- 调课与退课：保留原 Lesson 的审计字段，不直接删除\r\n- 课后进度记录：触发 `ProgressRecord` 创建，由 `progress_service` 与 `renewal_detector` 串联\r\n\r\n## 核心设计思想\r\n\r\n### 1. 用任务分类降低系统复杂度\r\n\r\n系统并不让一个 Agent 处理所有事情，而是先判断家长或学员意图，再分发给对应模块。这样可以让咨询、预约、行为分析等逻辑保持独立，也更容易扩展新的 Agent，例如后续可以加入“续费提醒 Agent”或“学习报告 Agent”。\r\n\r\n### 2. 用 RAG 解决专业知识回答",
+      "keywords": [],
+      "subject": null,
+      "grade_level": null,
+      "source_file": "README.md",
+      "category": "test",
+      "doc_type": null
+    },
+    {
+      "doc_id": 93,
+      "content": "```\n    分子间作用力：\n    \n    分子间距较小时：斥力 > 引力 → 表现为斥力 → 难压缩\n    分子间距较大时：引力 > 斥力 → 表现为引力 → 难拉伸\n```\n\n**答**：固体和液体很难被压缩，是因为分子之间存在**斥力**。当分子间距减小时，斥力急剧增大，阻止分子进一步靠近，所以很难被压缩。\n\n---\n\n## 10.2 原子的结构\n\n### 📖 核心概念\n\n**原子的结构**：\n- 原子中心有**原子核**（带正电，体积很小但质量很大）\n- 核外有**电子**（带负电）绕核运动\n- 原子核由**质子**（带正电）和**中子**（不带电）组成\n\n**原子结构模型的发展**：\n\n| 模型 | 提出者 | 主要内容 |\n|------|--------|----------|\n| 原子不可分 | 道尔顿 | 原子是最小粒子 |\n| 枣糕模型 | 汤姆孙 | 正电荷均匀分布，电子嵌其中 |\n| 核式结构 | 卢瑟福 | 原子核在中心，电子绕核运动 |\n| 电子云模型 | 现代 | 电子在核外空间出现的概率分布 |\n\n> 💡 **关键发现**：α 粒子散射实验推翻了枣糕模型，建立了核式结构模型。\n\n---\n\n### 📝 例题 81：原子结构\n\n**题目**：原子核带什么电？电子带什么电？原子整体呈电中性，这是为什么？\n\n**解析**：\n\n| 粒子 | 电性 |\n|------|------|\n| 质子 | 正电 |\n| 中子 | 不带电 |\n| 原子核 | 正电（含质子） |\n| 电子 | 负电 |\n\n**答**：原子核带**正电**（因为含有质子），电子带**负电**。原子整体呈电中性是因为原子核所带的正电荷数等于核外电子所带的负电荷数，正负电荷相互抵消，所以原子不显电性。\n\n---\n\n### 📝 例题 82：原子核组成\n\n**题目**：原子核由什么粒子组成？这些粒子各带什么电？\n\n**解析**：\n\n```\n    原子核组成：\n    \n    原子核\n    ├── 质子（带正电）\n    └── 中子（不带电）\n```\n\n**答**：原子核由**质子**和**中子**组成。质子带**正电**，中子**不带电**。\n\n---\n\n## 10.3 宇宙概观\n\n### 📖 核心概念\n\n**太阳系的组成**：",
+      "keywords": [
+        "运动与声"
+      ],
+      "subject": "物理",
+      "grade_level": "初中",
+      "source_file": "沪科版八年级物理_运动与声.md",
+      "category": "subject_knowledge",
+      "doc_type": "subject_method"
     }
   ],
   "cases": [
     {
       "id": "rag_001",
-      "version": "1.0.0",
-      "query": "高中数学 12 周提分方案包含哪些模块？",
-      "expected_doc_ids": [1],
-      "note": "明确答案: doc1"
+      "version": "2.0.0",
+      "query": "孩子明年高考，数学想系统补一轮，你们那边大概怎么安排",
+      "expected_doc_ids": [
+        1
+      ],
+      "note": "高三冲刺套餐 + 高三数学提分方案应命中",
+      "source_quote": "12 周提分方案：函数、几何、数列、概率四大模块系统讲，重点章节以高考真题为载体，包含一对一作业批改、错题梳理、阶段测试三个环节",
+      "label_source": "human_reviewed"
     },
     {
       "id": "rag_002",
-      "version": "1.0.0",
-      "query": "高三冲刺套餐是几月到几月完成复习？",
-      "expected_doc_ids": [2],
-      "note": "明确答案: doc2"
+      "version": "2.0.0",
+      "query": "这个数学课一共上多少讲，中间怎么检查效果",
+      "expected_doc_ids": [
+        1
+      ],
+      "note": "提分方案里的环节与目标",
+      "source_quote": "题为载体，包含一对一作业批改、错题梳理、阶段测试三个环节，目标是高考数学从平均分提升 20-30 分。",
+      "label_source": "human_reviewed"
     },
     {
       "id": "rag_003",
-      "version": "1.0.0",
-      "query": "小学阅读启蒙课用什么作为教学载体？",
-      "expected_doc_ids": [3],
-      "note": "明确答案: doc3"
+      "version": "2.0.0",
+      "query": "第一次找家教，怎么判断这个老师跟孩子合不合适",
+      "expected_doc_ids": [
+        6
+      ],
+      "note": "选老师的判断维度",
+      "source_quote": "如何帮孩子选择合适的家教老师：先看学科匹配（数学 / 物理 / 英语等），再看年级段（小学 / 初中 / 高中），最后考虑",
+      "label_source": "human_reviewed"
     },
     {
       "id": "rag_004",
-      "version": "1.0.0",
-      "query": "数学思维训练有哪些方法？",
-      "expected_doc_ids": [4],
-      "note": "明确答案: doc4"
+      "version": "2.0.0",
+      "query": "能不能先见一面再决定要不要长期上课",
+      "expected_doc_ids": [
+        6
+      ],
+      "note": "先试讲再决定的建议",
+      "source_quote": "启发式）和孩子的接受度。建议先安排一次 30 分钟试讲再决定。",
+      "label_source": "human_reviewed"
     },
     {
       "id": "rag_005",
-      "version": "1.0.0",
-      "query": "一元二次方程韦达定理怎么学？",
-      "expected_doc_ids": [5],
-      "note": "明确答案: doc5"
+      "version": "2.0.0",
+      "query": "临街的教室吵得没法上课，一般都有哪些办法压下去",
+      "expected_doc_ids": [
+        46
+      ],
+      "note": "学校降噪方案三途径",
+      "source_quote": "│ │     • 在学校和马路之间建隔音墙                       │ │",
+      "label_source": "human_reviewed"
     },
     {
       "id": "rag_006",
-      "version": "1.0.0",
-      "query": "怎么帮孩子选一位合适的家教老师？",
-      "expected_doc_ids": [6],
-      "note": "明确答案: doc6"
+      "version": "2.0.0",
+      "query": "学校紧挨着马路，怎么把外面的动静挡住",
+      "expected_doc_ids": [
+        46
+      ],
+      "note": "降噪方案：隔音墙 / 隔音窗户 / 隔音林带",
+      "source_quote": "│ │     • 安装隔音窗户                                   │ │",
+      "label_source": "human_reviewed"
     },
     {
       "id": "rag_007",
-      "version": "1.0.0",
-      "query": "高考数学如何提分",
-      "expected_doc_ids": [1, 2],
-      "note": "跨文档: 提分方案 + 高三冲刺套餐"
+      "version": "2.0.0",
+      "query": "降噪这件事从哪几个环节下手比较有效",
+      "expected_doc_ids": [
+        44
+      ],
+      "note": "控制噪声的三个途径",
+      "source_quote": "**控制噪声的三个途径**：  ``` ┌──────────────────────────────",
+      "label_source": "human_reviewed"
     },
     {
       "id": "rag_008",
-      "version": "1.0.0",
-      "query": "小学孩子数学基础怎么打牢",
-      "expected_doc_ids": [4],
-      "note": "语义近义: 数学思维训练"
+      "version": "2.0.0",
+      "query": "在家里想安静一点，能采取哪些做法",
+      "expected_doc_ids": [
+        44
+      ],
+      "note": "耳塞 / 关窗 / 隔音等具体做法",
+      "source_quote": "│ │              │  戴耳塞     │                         │ │",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_009",
+      "version": "2.0.0",
+      "query": "一滴墨水进去整杯水都变了色，这是为什么",
+      "expected_doc_ids": [
+        92
+      ],
+      "note": "扩散现象与分子无规则运动",
+      "source_quote": "分子在永不停息地做**无规则运动**（扩散现象） | | ③ | 分子之间存在**引力**和**斥力** |  > 💡 **扩",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_010",
+      "version": "2.0.0",
+      "query": "为什么水很难被压小一点体积",
+      "expected_doc_ids": [
+        92
+      ],
+      "note": "分子间斥力解释难压缩",
+      "source_quote": "时：斥力 > 引力 → 表现为斥力 → 难压缩     分子间距较大时：引力 > 斥力 → 表现为引力 → 难拉伸 ```",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_011",
+      "version": "2.0.0",
+      "query": "业务逻辑都放在哪个目录里，有没有统一的服务类",
+      "expected_doc_ids": [
+        20
+      ],
+      "note": "services/ 目录清单",
+      "source_quote": "# 业务逻辑层\r │   ├── teacher_service.py",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_012",
+      "version": "2.0.0",
+      "query": "每张表是不是单独封了一个数据访问类",
+      "expected_doc_ids": [
+        21
+      ],
+      "note": "repositories/ 逐表封装",
+      "source_quote": "# Repository 数据访问封装\r │       ├── knowledge_repository.py\r │",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_013",
+      "version": "2.0.0",
+      "query": "跑这个项目之前要先填哪些配置项",
+      "expected_doc_ids": [
+        24
+      ],
+      "note": ".env 配置项清单",
+      "source_quote": "ding_base_url_here\r EMBEDDING_MODEL=your_embedding_model_name_here\r \r DATAB",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_014",
+      "version": "2.0.0",
+      "query": "服务起来之后占不到默认端口怎么办",
+      "expected_doc_ids": [
+        24
+      ],
+      "note": "端口被占用时换 8001",
+      "source_quote": "d\r ```\r \r 如果 8000 端口已被占用，可以换成 8001：\r \r ```bash\r python -m uvicor",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_015",
+      "version": "2.0.0",
+      "query": "哪些跨层调用是明令禁止的",
+      "expected_doc_ids": [
+        12
+      ],
+      "note": "五层架构禁止的调用方式",
+      "source_quote": "### 禁止的调用方式\r \r - 下层反向调用上层\r - Web 层绕过 API 直接访问 Services 或 DB\r - Ag",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_016",
+      "version": "2.0.0",
+      "query": "接到超出服务范围的请求要怎么处理",
+      "expected_doc_ids": [
+        12
+      ],
+      "note": "超范围需求礼貌回退",
+      "source_quote": "ent 之间的切换\r - 处理无法分类或超出能力范围的问题，例如明确表示不接 K12 之外的需求时礼貌回退\r \r ### Consu",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_017",
+      "version": "2.0.0",
+      "query": "哪几个文件负责周课自动排期和调课退课",
+      "expected_doc_ids": [
+        18
+      ],
+      "note": "schedule_generator / reschedule_handler / cancel_handler",
+      "source_quote": "nerator.py        # 周固定系列课展开\r │   │   ├── conflict_detector.py",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_018",
+      "version": "2.0.0",
+      "query": "什么时候会提醒家长该续费了，怎么看流失风险",
+      "expected_doc_ids": [
+        10
+      ],
+      "note": "续费与流失预警机制",
+      "source_quote": "engagement_score` 评估流失风险。\r - **个性化提醒**：在课程预约完成后，可结合实时天气、近期考试节点等外",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_019",
+      "version": "2.0.0",
+      "query": "课时有哪几种类型，能不能按周固定排",
+      "expected_doc_ids": [
+        10
+      ],
+      "note": "四种课时类型 + 周固定系列课",
+      "source_quote": "单次正式课 / 周固定系列课 / 补课四种课时类型；周固定系列课由 `LessonSeries` 按 `weekly_patter",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_020",
+      "version": "2.0.0",
+      "query": "前端一共做了多少个页面模板",
+      "expected_doc_ids": [
+        22
+      ],
+      "note": "templates/ 页面数量与清单",
+      "source_quote": "# HTML 模板（11 个页面）\r │   │   ├── index.html",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_021",
+      "version": "2.0.0",
+      "query": "项目依赖了哪些库和外部服务",
+      "expected_doc_ids": [
+        17
+      ],
+      "note": "技术栈 + MCP 外部服务",
+      "source_quote": "nja2 模板、静态 CSS\r - **外部服务扩展**：MCP，用于天气、节假日等外部信息接入\r - **配置管理**：pytho",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_022",
+      "version": "2.0.0",
+      "query": "为什么机翼能产生升力",
+      "expected_doc_ids": [
+        79
+      ],
+      "note": "流速与压强关系 + 飞机升力",
+      "source_quote": "| |------|------| | 飞机升力 | 机翼上方空气流速大、压强小；下方流速小、压强大，产生向上的升力 | | 两",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_023",
+      "version": "2.0.0",
+      "query": "弹簧测力计用之前要注意些什么",
+      "expected_doc_ids": [
+        69
+      ],
+      "note": "弹簧测力计使用注意事项",
+      "source_quote": "正比** | | **使用方法** | 一看（量程和分度值）、二调（调零）、三测（沿轴线方向拉）、四读（视线与刻度面垂直） |  ---",
+      "label_source": "human_reviewed"
+    },
+    {
+      "id": "rag_024",
+      "version": "2.0.0",
+      "query": "想把教室的噪音降下来，具体有哪些做法",
+      "expected_doc_ids": [
+        44,
+        46
+      ],
+      "note": "跨文档: 噪声控制三途径 + 学校降噪方案",
+      "source_quote": "│ │  ① 在声源处减弱          ② 在传播过程中减弱          │ │  ┌────",
+      "label_source": "human_reviewed"
     }
   ]
 }

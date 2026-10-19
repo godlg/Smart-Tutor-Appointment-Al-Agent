@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>老师登录</title>
+    <style>
+        :root {
+            --ink: #17222e;
+            --muted: #5d6b7a;
+            --line: #d5dde5;
+            --accent: #1f6feb;
+            --danger: #b42318;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f2f5f8;
+            color: var(--ink);
+            font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+        }
+        .card {
+            width: 100%;
+            max-width: 380px;
+            padding: 36px 32px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            box-shadow: 0 18px 40px -28px rgba(23, 34, 46, 0.5);
+        }
+        .eyebrow {
+            font-size: 12px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        h1 {
+            margin: 6px 0 4px;
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .hint {
+            margin: 0 0 24px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 16px;
+            font-size: 15px;
+            color: var(--ink);
+            background: #fbfcfe;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.12);
+        }
+        button {
+            width: 100%;
+            padding: 11px 16px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+            background: var(--accent);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover { background: #1a5fd0; }
+        button:disabled { background: #9db6dd; cursor: default; }
+        .error {
+            display: none;
+            margin: 0 0 16px;
+            padding: 9px 12px;
+            font-size: 13px;
+            color: var(--danger);
+            background: #fdf1f0;
+            border-left: 3px solid var(--danger);
+            border-radius: 4px;
+        }
+        .error.visible { display: block; }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="eyebrow">Smart Tutor</div>
+        <h1>老师登录</h1>
+        <p class="hint">请使用机构分配的老师账号登录</p>
+
+        <p class="error" id="error-box" role="alert"></p>
+
+        <form id="login-form" autocomplete="off">
+            <label for="username">用户名</label>
+            <input type="text" id="username" name="username" required>
+
+            <label for="password">密码</label>
+            <input type="password" id="password" name="password" required>
+
+            <button type="submit" id="submit-btn">登录</button>
+        </form>
+    </main>
+
+    <script>
+        const form = document.getElementById('login-form');
+        const errorBox = document.getElementById('error-box');
+        const submitBtn = document.getElementById('submit-btn');
+
+        function showError(text) {
+            errorBox.textContent = text;
+            errorBox.classList.add('visible');
+        }
+
+        form.onsubmit = async function (event) {
+            event.preventDefault();
+            errorBox.classList.remove('visible');
+            submitBtn.disabled = true;
+            try {
+                const response = await fetch('/api/console/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value,
+                        password: document.getElementById('password').value,
+                    }),
+                });
+                if (response.status === 200) {
+                    const body = await response.json();
+                    const role = body.data && body.data.role;
+                    if (role === 'teacher') {
+                        location.href = '/teacher';
+                        return;
+                    }
+                    showError('该账号不是老师账号，请走 /console/login');
+                    return;
+                }
+                showError('用户名或密码错误');
+            } catch (err) {
+                showError('登录请求失败，请稍后重试');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

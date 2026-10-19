@@ -40,6 +40,32 @@ def _collect(agen):
     return _run(_drain(agen))
 
 
+def _login_console(client, tmp_path, monkeypatch, username="admin",
+                   password="admin12345", filename="console_live.db"):
+    """客服侧 API 已挂控制台闸门:显式临时库播种默认账号并登录拿 cookie。
+
+    显式传临时库路径,不依赖 ConsoleAuthService 的默认(生产)库。
+    """
+    from api.core import console_auth as console_dep
+    from config.console_auth import CONSOLE_COOKIE_NAME
+    from services.console_auth_service import ConsoleAuthService
+
+    console_db = f"sqlite:///{(tmp_path / filename).as_posix()}"
+    original_init = ConsoleAuthService.__init__
+
+    def _patched_init(self, db_path=None, *args, **kwargs):
+        original_init(self, db_path=db_path or console_db)
+
+    monkeypatch.setattr(ConsoleAuthService, "__init__", _patched_init)
+    monkeypatch.setattr(console_dep, "_console_auth_service", None, raising=False)
+    ConsoleAuthService(db_path=console_db).ensure_default_users()
+
+    response = client.post("/api/console/login",
+                           json={"username": username, "password": password})
+    assert response.status_code == 200, response.text
+    assert CONSOLE_COOKIE_NAME in response.cookies
+
+
 HANDOFF_REPLY = (
     "抱歉，连续几次没能帮您解决问题，已为您转接人工顾问老师。"
     "您的对话记录已保存，顾问老师会尽快与您联系。"
@@ -343,7 +369,18 @@ class TestHandedOffStillFixedReply:
 class TestHandoffLiveAPI:
 
     @pytest.fixture
-    def client(self, monkeypatch, tmp_path):
+    def identities(self, monkeypatch, tmp_path):
+        """匿名身份服务指向临时文件库：家长侧 cookie 校验走 `api.identity` 单例，不能落到默认（生产）库。"""
+        from api import identity as api_identity
+        from services.identity_service import IdentityService
+
+        service = IdentityService(f"sqlite:///{(tmp_path / 'handoff_live_identity.db').as_posix()}")
+        monkeypatch.setattr(api_identity, "_identity_service", service)
+        yield service
+        service.close()
+
+    @pytest.fixture
+    def client(self, monkeypatch, tmp_path, identities):
         from fastapi.testclient import TestClient
         from app import app
         from services.human_handoff_service import HumanHandoffService
@@ -364,17 +401,21 @@ class TestHandoffLiveAPI:
 
         monkeypatch.setattr(HumanHandoffService, "__init__", _patched_init)
         client = TestClient(app)
+        _login_console(client, tmp_path, monkeypatch)
         yield client
         if shared["router"] is not None:
             shared["router"].close()
 
-    def test_reply_then_fetch_messages(self, client):
+    def test_reply_then_fetch_messages(self, client, identities):
+        from config.identity import IDENTITY_COOKIE_NAME
         from services.human_handoff_service import HumanHandoffService
 
         svc = HumanHandoffService()
         record = svc.trigger_handoff("api-live", "keyword", reason="人工")
         hid = record["id"]
         svc.parent_message("api-live", "大概什么时候能回复我")
+        owner = identities.issue_new_identity()
+        identities.create_session(owner, "api-live")
 
         r = client.post(f"/api/handoffs/{hid}/claim", json={"agent_id": "客服小美"})
         assert r.status_code == 200, r.text
@@ -396,6 +437,7 @@ class TestHandoffLiveAPI:
         # created_at 已转 ISO 字符串
         assert isinstance(msgs[0]["created_at"], str)
 
+        client.cookies.set(IDENTITY_COOKIE_NAME, owner.user_id)
         r4 = client.get("/api/handoffs/session/api-live/messages")
         assert r4.status_code == 200, r4.text
         session_msgs = r4.json()["data"]
@@ -425,7 +467,11 @@ class TestHandoffLiveAPI:
         )
         assert r.status_code == 404
 
-    def test_session_messages_endpoint_empty_for_unknown(self, client):
+    def test_session_messages_endpoint_empty_for_unknown(self, client, identities):
+        """未出现过的 session_id：带合法匿名身份 cookie → 200 + []（首次出现即绑定给当前身份，D 轮既有语义）。"""
+        from config.identity import IDENTITY_COOKIE_NAME
+
+        client.cookies.set(IDENTITY_COOKIE_NAME, identities.issue_new_identity().user_id)
         r = client.get("/api/handoffs/session/nobody/messages")
         assert r.status_code == 200, r.text
         assert r.json()["data"] == []

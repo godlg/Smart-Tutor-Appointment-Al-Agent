@@ -48,6 +48,17 @@ def _patch_embed(monkeypatch):
     monkeypatch.setattr(hybrid_retriever, "embed_input", _fake_embed)
 
 
+@pytest.fixture(autouse=True)
+def _pin_query_transform_off(monkeypatch):
+    """C/D 组只验证学科-年级抽取与透传,与 query 变换无关 → 固定 off 档,
+    底层检索串恒为 [query] 单条,断言不受变换规则增删影响。
+    (变换本身由 tests/test_query_transform.py 覆盖。)
+    """
+    from config.settings import settings
+
+    monkeypatch.setattr(settings, "query_transform_mode", "off")
+
+
 @pytest.fixture
 def in_memory_db():
     """全新内存 SQLite(schema + migration 已跑过)。"""
@@ -374,13 +385,16 @@ class TestServiceFilterThenVectorNullExemption:
 # ======================================================================
 
 def _make_retriever(mock_search, mode: str = "dense"):
-    """构造 KnowledgeRetriever,用 mock 顶替底层检索(隔离真实检索 / LLM)。"""
+    """构造 KnowledgeRetriever,用 mock 顶替底层检索(隔离真实检索 / LLM)。
+
+    底层入口是 search_multi(多查询检索, search() 是其单查询薄包装)。
+    """
     from agents.consultant.knowledge_retriever import KnowledgeRetriever
 
     retriever = KnowledgeRetriever()
     retriever.retrieval_mode = mode
     service = MagicMock()
-    service.search = mock_search
+    service.search_multi = mock_search
     retriever.knowledge_service = service
     retriever.kb_initialized = True  # 跳过真实初始化
     return retriever
@@ -393,7 +407,7 @@ def _make_hybrid_retriever(mock_search):
     retriever.retrieval_mode = "hybrid"
     retriever.kb_initialized = True
     retriever.hybrid_retriever = MagicMock()
-    retriever.hybrid_retriever.search = mock_search
+    retriever.hybrid_retriever.search_multi = mock_search
     return retriever
 
 
@@ -407,7 +421,7 @@ class TestSearchKnowledgeFilterPassThrough:
         ))
 
         mock.assert_awaited_once_with(
-            "高一数学怎么提分", top_k=3, subject="数学", grade_level="高中"
+            ["高一数学怎么提分"], top_k=3, subject="数学", grade_level="高中"
         )
 
     def test_hybrid_path_receives_subject_and_grade(self):
@@ -419,7 +433,7 @@ class TestSearchKnowledgeFilterPassThrough:
         ))
 
         mock.assert_awaited_once_with(
-            "高一数学怎么提分", top_k=3, subject="数学", grade_level="高中"
+            ["高一数学怎么提分"], top_k=3, subject="数学", grade_level="高中"
         )
 
     def test_backward_compatible_without_filters(self):
@@ -429,7 +443,9 @@ class TestSearchKnowledgeFilterPassThrough:
 
         _run(retriever.search_knowledge("计算薄弱", top_k=3))
 
-        mock.assert_awaited_once_with("计算薄弱", top_k=3, subject=None, grade_level=None)
+        mock.assert_awaited_once_with(
+            ["计算薄弱"], top_k=3, subject=None, grade_level=None
+        )
 
     def test_query_context_still_spliced_with_filters(self):
         """过滤参数不影响原有 query_context 拼接行为。"""
@@ -442,7 +458,7 @@ class TestSearchKnowledgeFilterPassThrough:
         ))
 
         mock.assert_awaited_once_with(
-            "用户: 初二,数学不行\n计算薄弱", top_k=3,
+            ["用户: 初二,数学不行\n计算薄弱"], top_k=3,
             subject="数学", grade_level="初中",
         )
 
@@ -480,8 +496,9 @@ class TestProcessorExtractionPassThrough:
 
         assert text == "回答"
         assert "抱歉" not in text and "错误" not in text, "抽取链路不应产生任何错误输出"
+        # off 档:底层只收到原始 query 单条(变换规则由 test_query_transform.py 覆盖)
         mock.assert_awaited_once_with(
-            "孩子高一,数学想提分,有什么课程?", top_k=3,
+            ["孩子高一,数学想提分,有什么课程?"], top_k=3,
             subject="数学", grade_level="高中",
         )
 
@@ -495,7 +512,7 @@ class TestProcessorExtractionPassThrough:
         )))
 
         mock.assert_awaited_once_with(
-            "那物理呢?", top_k=3, subject="物理", grade_level="高中"
+            ["那物理呢?"], top_k=3, subject="物理", grade_level="高中"
         )
 
     def test_stream_uses_profile_provider_as_last_resort(self):
@@ -508,7 +525,7 @@ class TestProcessorExtractionPassThrough:
         )))
 
         mock.assert_awaited_once_with(
-            "有什么课程推荐?", top_k=3, subject="数学", grade_level="高中"
+            ["有什么课程推荐?"], top_k=3, subject="数学", grade_level="高中"
         )
 
     def test_stream_without_extractable_context_stays_unfiltered(self):
@@ -521,7 +538,8 @@ class TestProcessorExtractionPassThrough:
         )))
 
         mock.assert_awaited_once_with(
-            "孩子上课注意力不集中怎么办", top_k=3, subject=None, grade_level=None
+            ["孩子上课注意力不集中怎么办"], top_k=3,
+            subject=None, grade_level=None,
         )
 
     def test_stream_passes_filters_on_hybrid_path(self):
@@ -533,5 +551,5 @@ class TestProcessorExtractionPassThrough:
         )))
 
         mock.assert_awaited_once_with(
-            "高二物理电磁学怎么补", top_k=3, subject="物理", grade_level="高中"
+            ["高二物理电磁学怎么补"], top_k=3, subject="物理", grade_level="高中"
         )

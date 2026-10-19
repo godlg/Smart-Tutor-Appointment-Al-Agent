@@ -89,6 +89,12 @@ SCRIPTS_TO_PARSE = [
     "teacher_detail.html",
     "knowledge_management.html",
     "user_behavior_analysis.html",
+    # 控制台分面 B 新增的两个后台页
+    "console_login.html",
+    "console_home.html",
+    # 老师面新增的两个页面
+    "teacher_login.html",
+    "teacher_home.html",
 ]
 
 

@@ -8,7 +8,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)
 ![Orchestration](https://img.shields.io/badge/Orchestration-LangGraph%20%7C%20LangChain-1C3C3C)
-![Tests](https://img.shields.io/badge/tests-1281%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1600%20passed-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 </div>
@@ -21,7 +21,7 @@
 
 本项目把这条链路做成一个可运行的多 Agent 系统：家长用自然语言提问，系统先识别意图，再把任务分发给对应的专业 Agent，完成老师匹配、试讲预约与转化、正式课/系列课排课与调课退课、RAG 知识问答、学习进度与流失预警，并在 AI 处理不了时把会话交给人工。
 
-技术栈 FastAPI + LangChain/LangGraph + SQLAlchemy(SQLite) + FAISS，五层单向依赖架构，25 张表 / 61 条路由 / 10 类意图 / 1281 条测试全绿。
+技术栈 FastAPI + LangChain/LangGraph + SQLAlchemy(SQLite) + FAISS，五层单向依赖架构，27 张表 / 72 条路由 / 10 类意图 / 1600 条测试全绿。
 
 ## 核心能力
 
@@ -43,13 +43,13 @@
 
 **检索**
 
-- **混合检索 Hybrid RAG**：Dense(FAISS) + BM25(jieba 中文分词) 双路召回 → RRF 融合 → 本地 ONNX cross-encoder 精排（`bge-reranker-base` 中文优先），精排不可用时自动回退 RRF 结果
+- **混合检索 Hybrid RAG**：Dense(FAISS) + BM25(jieba 中文分词) 双路召回 → RRF 融合 → 本地 ONNX cross-encoder 精排（`bge-reranker-base` 中文优先）；dense 路依赖外部 embedding API，失败时降级为 BM25-only 而不是丢掉整轮召回，两路皆空才返回空召回；检索前对口语化 query 做多查询变换（默认规则档、零 LLM，原串恒排第 0 位），各路召回结果一起进 RRF；精排后按内容去重（相关性阈值默认关闭，开启需按模型量纲校准），命中结果在 prompt 中带 `[资料N|分类]` 来源编号；精排不可用时自动回退 RRF 结果（该路径不应用阈值）
 - **分层记忆**：会话短期记忆 + 长期记忆 Top-5 相关召回（`0.6*相似度 + 0.3*时间衰减 + 0.1*重要度`）+ 画像摘要共存；上下文窗口占用超阈值触发滚动摘要并持久化
 - **AutoDream 后台回放**：会话数达到阈值后异步回放近期对话，增量抽取知识点，向量去重合并、冲突降权，带任务锁 + 检查点 + 变更日志保证幂等
 
 **工程与质量**
 
-- **EDD 评估与发布门禁**：51 条冻结用例（routing 12 / rag 8 / slot 10 / tool 7 / handoff 6 / safety 红队 8）与 9 项门禁阈值（准确率、Recall@3、P95 延迟、Token 成本、最大步数），任一不达标即 `exit 1` 拦截发布
+- **EDD 评估与发布门禁**：67 条冻结用例（routing 12 / rag 24 / slot 10 / tool 7 / handoff 6 / safety 红队 8）与 10 项门禁阈值（准确率、Recall@3、P95 延迟、Token 成本、最大步数），任一不达标即 `exit 1` 拦截发布
 - **可观测性**：JSON 结构化日志 + `X-Request-ID` 中间件 + 零依赖 span 链路追踪（嵌套 / 耗时 / 异常标记），埋点在分类、检索、工具调用三处，另暴露 Prometheus `/metrics`
 - **组件工厂**：LLM / Embedding / Splitter / VectorStore / Reranker / Evaluator 六类组件通过 `config/components.yaml` 声明式切换实现，缺失即回落默认，不重构现有调用路径
 
@@ -67,9 +67,11 @@
 | `/progress-dashboard` | 学员学习进度看板 |
 | `/student-profile` | 学生档案（薄弱点、偏好、活跃度、流失风险） |
 | `/parent-center` | 家长中心（续费提醒、流失预警、推荐汇总） |
-| `/human-handoff` | 人工接管队列（客服 claim / 回复） |
-| `/knowledge` | 学科知识库管理 |
-| `/user_behavior_analysis` | 学员行为分析看板 |
+| `/console/login` | 机构后台登录（`admin` / `support` / `academic` 三种角色） |
+| `/console/human-handoff` | 人工接管队列（客服 claim / 回复；需 `support` 或 `admin`） |
+| `/console/knowledge` | 学科知识库管理（需 `academic` 或 `admin`） |
+| `/console/user_behavior_analysis` | 学员行为分析看板（需 `academic` 或 `admin`） |
+| `/teacher/login` · `/teacher` | 老师端：本老师待办、确认 / 拒绝档期（需老师账号） |
 
 ## 系统架构
 
@@ -78,13 +80,13 @@
 ```text
 Web & Application   app.py, web/          页面、路由入口、启动与调度
         ↓
-API                 api/                  61 条路由、请求编排、统一响应封装
+API                 api/                  72 条路由、请求编排、统一响应封装
         ↓
 Agents              agents/               意图识别、多 Agent 流程、LangGraph 图
         ↓
 Services            services/             推荐、排课、检索、记忆、人工接管
         ↓
-DB                  db/                   25 张表的 SQLAlchemy 模型 + Repository
+DB                  db/                   27 张表的 SQLAlchemy 模型 + Repository
 ```
 
 | Agent | 职责 |
@@ -133,11 +135,34 @@ EMBEDDING_MODEL=your_embedding_model_name
 
 DATABASE_URL=sqlite:///./data/smart_appointment.db
 
-RETRIEVAL_MODE=hybrid    # dense 单路 / hybrid 双路+RRF+精排
+RETRIEVAL_MODE=hybrid    # dense 单路 / hybrid 双路+RRF+精排（默认 hybrid）
 RERANK_ENABLED=true
+# RAG_MIN_RERANK_SCORE=0.0 # 精排相关性阈值，默认关闭（不设阈值，不过滤）；只在精排真的跑过时生效。
+                          # 开启需按模型量纲校准：bge 的 logit 随 query 口语化程度整体下移，
+                          # 0.0 不是中性分界（实测会把 recall@3 从 0.9167 打到 0.5000）。
+RERANK_MAX_LENGTH=512    # 精排 tokenizer 截断长度（默认 512），中文 ~1 字 ≈ 1 token
+QUERY_TRANSFORM=rule     # off / rule（默认，零 LLM）/ llm；检索前把口语化 query 扩成多查询召回
+QUERY_TRANSFORM_TIMEOUT=3.0     # llm 档超时秒数；超时/异常一律回退 rule 结果
+QUERY_TRANSFORM_MAX_VARIANTS=3  # 变体数上限（含原始 query，原串恒排第 0 位）
+CHUNK_SIZE=500           # 分块大小（默认 500），须与 components.yaml 的 splitter 一致
+CHUNK_OVERLAP=50         # 分块重叠（默认 50）
 HANDOFF_THRESHOLD=3      # 连续踢回多少次自动转人工
 ORCHESTRATOR=legacy      # legacy 自研状态机 / graph LangGraph 编排
 ```
+
+### 检索前 query 变换（多查询召回）
+
+用户口语化 / 指代不清的 query 在检索前先变换成 1~3 条检索串，各自召回后按 RRF 融合
+（`services/query_transform.py` + `HybridRetriever.search_multi` / `KnowledgeService.search_multi`）。
+**原始 query 永远排第 0 位且必须被检索** —— 变换只增量提高召回，不降低。
+
+| 档位 | 行为 |
+| --- | --- |
+| `off` | 不变换，只检索原始 query |
+| `rule`（默认） | 零 LLM 成本两条规则：术语归一（试听/试课→试讲、多少钱→收费标准 价格、1对1→一对一…）+ 指代补全（命中「这个/那个/怎么样」且上下文能抽出「年级 + 学科」时补成 `年级学科：query`，抽不到就不产） |
+| `llm` | 额外调一次小 LLM（温度 0）产最多 2 条改写，与 rule 变体合并去重；超时（默认 3.0s）/ 异常 / 解析失败一律回退 rule 结果 |
+
+`services/query_transform.py` 全程不抛异常：任何档位下返回值都非空、`[0]` 恒为原串、无重复、不超上限。
 
 可选：`python scripts/download_reranker.py` 下载本地精排模型到 `cache/`（`bge-reranker-base`，约 279MB，走 hf-mirror）；不下载则精排自动回退 RRF。
 
@@ -152,35 +177,36 @@ python scripts/demo_human_handoff.py             # 人工接管：关键词/阈�
 python scripts/demo_langgraph_migrate.py         # LangGraph 图编排与对拍
 python scripts/demo_observability_logs_traces.py # 结构化日志 / X-Request-ID / span 追踪
 python scripts/demo_component_factory.py         # 六类组件声明式切换
+python scripts/demo_query_transform.py           # query 变换：off / rule / llm 三档变体与召回差异
 ```
 
 ## 测试与评估
 
 ```bash
-pytest tests/ -q                     # 1281 passed（2026-10-08 实测）
+pytest tests/ -q                     # 1600 passed（2026-10-19 实测）
 python -m eval.runner                # EDD 冻结用例 + 发布门禁
 ```
 
 | 指标 | 实测值 |
 | --- | --- |
-| 单元 / 集成测试 | 1281 passed（70 个测试文件） |
-| 冻结评估用例 | 51 条（routing / rag / slot / tool / handoff / safety） |
-| 发布门禁 | 9 项阈值全过（`eval/gates.py` 读 `config/evals.yaml`） |
-| 数据表 / API 路由 / 意图类别 | 25 / 61 / 10 |
+| 单元 / 集成测试 | 1600 passed（80 个测试文件） |
+| 冻结评估用例 | 67 条（routing 12 / rag 24 / slot 10 / tool 7 / handoff 6 / safety 8） |
+| 发布门禁 | 10 项阈值全过（`eval/gates.py` 读 `config/evals.yaml`；`--only` 子集模式输出 PARTIAL 且只校验已跑类别） |
+| 数据表 / API 路由 / 意图类别 | 27 / 72 / 10 |
 
 ## 项目结构
 
 ```text
 ├── agents/          # 主控 + 4 业务 Agent + LangGraph 图 + Agentic 工具循环
-├── api/             # API 编排层（13 个 router + core 响应封装）
-├── services/        # 业务逻辑：推荐 / 排课 / 知识库 / 混合检索 / 记忆 / 人工接管
-├── db/              # SQLAlchemy 模型 + Repository（25 张表）
+├── api/             # API 编排层（16 个 router + core 响应封装）
+├── services/        # 业务逻辑：推荐 / 排课 / 知识库 / 混合检索 / query 变换 / 记忆 / 人工接管
+├── db/              # SQLAlchemy 模型 + Repository（27 张表）
 ├── observability/   # 结构化日志、X-Request-ID、span 追踪、Prometheus 指标
 ├── eval/            # EDD 评估器、冻结用例、发布门禁
 ├── config/          # 设置、模型 Provider 工厂、时间语义、组件工厂、门禁阈值
-├── web/             # Web 页面与模板（12 个页面）
+├── web/             # Web 页面与模板（16 个页面）
 ├── scripts/         # 演示、重建 embedding、下载精排模型等工具脚本
-├── tests/           # 1281 条测试
+├── tests/           # 1600 条测试
 ├── app.py           # 应用入口（路由注册、初始化、调度器）
 └── requirements.txt
 ```

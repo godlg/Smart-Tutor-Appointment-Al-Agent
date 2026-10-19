@@ -454,6 +454,12 @@ def run_migration(db_path: str) -> bool:
                 "schema_migrator: human_handoffs 不存在,稍后由 create_all 创建"
             )
 
+        # 3.7) console_users.teacher_id (老师面): create_all 不补已存在表的列,必须在此加列。
+        if _table_exists(conn, "console_users"):
+            if "teacher_id" not in _get_columns(conn, "console_users"):
+                conn.execute("ALTER TABLE console_users ADD COLUMN teacher_id INTEGER")
+                logger.info("schema_migrator: console_users.teacher_id 列已添加")
+
         # Preserve legacy business tables and records. Retirement is not deletion.
 
         conn.commit()

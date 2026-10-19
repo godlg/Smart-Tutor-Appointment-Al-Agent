@@ -110,17 +110,17 @@ class TestPromptBuilder:
         assert "没有找到" in prompt or "常识" in prompt
 
     def test_build_consultation_prompt_with_docs_numbers_them(self):
-        """多条知识应按 1./2./3. 编号,LLM 引用时不会乱。"""
+        """多条知识应带来源编号(资料1/2/3),LLM 引用时不会乱。"""
         from agents.consultant.prompt_builder import PromptBuilder
         docs = [
-            {"content": "第一段"},
-            {"content": "第二段"},
-            {"content": "第三段"},
+            {"content": "第一段", "category": "faq"},
+            {"content": "第二段", "category": "faq"},
+            {"content": "第三段", "category": "faq"},
         ]
         prompt = PromptBuilder().build_consultation_prompt("Q", docs)
-        assert "1. 第一段" in prompt
-        assert "2. 第二段" in prompt
-        assert "3. 第三段" in prompt
+        assert "[资料1|faq] 第一段" in prompt
+        assert "[资料2|faq] 第二段" in prompt
+        assert "[资料3|faq] 第三段" in prompt
 
     def test_build_consultation_prompt_contains_system_role(self):
         """system_prompt 应进入 prompt,体现 agent 的角色约束。"""

@@ -87,3 +87,7 @@ Thumbs.db
 /docs/services层.md
 /面试准备问题.md
 /_smart_tutor_私密/
+
+# --- eval 生成物 / 草稿（不发布）---
+/eval/report.json
+/eval/cases/*.draft.json

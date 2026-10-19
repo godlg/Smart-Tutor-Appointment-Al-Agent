@@ -17,6 +17,9 @@ from .progress import router as progress_router
 from .trial import router as trial_router
 from .agentic import router as agentic_router
 from .handoff import router as handoff_router
+from .handoff import parent_side_router as handoff_parent_side_router
+from .console_auth import router as console_auth_router
+from .teacher_face import router as teacher_face_router
 
 
 def _filter_routers(routers):
@@ -39,4 +42,9 @@ api_routers = _filter_routers([
     trial_router,
     agentic_router,
     handoff_router,
+    # 家长侧轮询端点(无控制台闸门,与客服侧分属两个 router)
+    handoff_parent_side_router,
+    console_auth_router,
+    # 老师面(整个 router 挂 require_teacher)
+    teacher_face_router,
 ])

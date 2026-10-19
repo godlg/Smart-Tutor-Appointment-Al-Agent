@@ -1,4 +1,5 @@
 from .base import SessionManager
+from .base.session_manager import DEFAULT_DB_PATH  # 库路径单一来源,避免字面量漂移
 from .repositories import (
     KnowledgeRepository,
     UserBehaviorRepository,
@@ -22,7 +23,7 @@ class DatabaseRouter:
     统一管理数据库连接和会话，提供各领域 Repository 访问入口。
     """
 
-    def __init__(self, db_path: str = 'sqlite:///data/smart_appointment.db'):
+    def __init__(self, db_path: str = DEFAULT_DB_PATH):
         self.session_manager = SessionManager(db_path)
 
         # 领域 Repository (P1-9: 统一 *_repo 后缀命名)

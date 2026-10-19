@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>老师待办</title>
+    <style>
+        :root {
+            --ink: #17222e;
+            --muted: #5d6b7a;
+            --line: #d5dde5;
+            --accent: #1f6feb;
+            --ok: #067647;
+            --danger: #b42318;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 32px 24px;
+            background: #f2f5f8;
+            color: var(--ink);
+            font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            max-width: 960px;
+            margin: 0 auto 24px;
+        }
+        h1 { margin: 0; font-size: 22px; font-weight: 600; }
+        .muted { font-size: 13px; color: var(--muted); }
+        .error {
+            display: none;
+            max-width: 960px;
+            margin: 0 auto 16px;
+            padding: 9px 12px;
+            font-size: 13px;
+            color: var(--danger);
+            background: #fdf1f0;
+            border-left: 3px solid var(--danger);
+            border-radius: 4px;
+        }
+        .error.visible { display: block; }
+        .list {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr 1fr 1.6fr;
+            gap: 12px;
+            align-items: center;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--line);
+        }
+        .row:last-child { border-bottom: none; }
+        .row.head { font-size: 13px; color: var(--muted); }
+        .actions { display: flex; gap: 8px; align-items: center; }
+        input {
+            flex: 1;
+            min-width: 0;
+            padding: 7px 9px;
+            font-size: 13px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+        }
+        button {
+            padding: 7px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            background: var(--accent);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        button.reject { background: var(--danger); }
+        button:disabled { opacity: 0.5; cursor: default; }
+        .empty { padding: 28px 18px; text-align: center; color: var(--muted); font-size: 14px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>待办档期 · <span id="teacher-name">加载中…</span></h1>
+        <span class="muted" id="teacher-username"></span>
+    </header>
+
+    <p class="error" id="error-box" role="alert"></p>
+
+    <section class="list" id="lesson-list" aria-live="polite">
+        <div class="row head">
+            <div>时间</div>
+            <div>学科 / 类型</div>
+            <div>学生</div>
+            <div>操作</div>
+        </div>
+    </section>
+
+    <script>
+        const errorBox = document.getElementById('error-box');
+        const lessonList = document.getElementById('lesson-list');
+
+        function showError(text) {
+            errorBox.textContent = text;
+            errorBox.classList.add('visible');
+        }
+
+        function clearError() {
+            errorBox.classList.remove('visible');
+        }
+
+        function formatTime(isoText) {
+            const date = new Date(isoText);
+            if (Number.isNaN(date.getTime())) return isoText || '';
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        }
+
+        // 后端 detail 可能是字符串或校验错误数组;统一转成可读文本
+        function detailText(body, fallback) {
+            if (body && typeof body.detail === 'string') return body.detail;
+            return fallback;
+        }
+
+        async function requestJson(url, options) {
+            const response = await fetch(url, options);
+            if (response.status === 401) {
+                location.href = '/teacher/login';
+                throw new Error('未登录');
+            }
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(detailText(body, `请求失败（${response.status}）`));
+            }
+            return body;
+        }
+
+        function buildCell(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div;
+        }
+
+        function buildRow(lesson) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.appendChild(buildCell(formatTime(lesson.scheduled_at)));
+            row.appendChild(buildCell(`${lesson.subject || '—'} / ${lesson.lesson_type || '—'}`));
+            row.appendChild(buildCell(lesson.student_name || '—'));
+
+            const actions = document.createElement('div');
+            actions.className = 'actions';
+            const reasonInput = document.createElement('input');
+            reasonInput.type = 'text';
+            reasonInput.placeholder = '拒绝原因（可空）';
+            reasonInput.maxLength = 200;
+            const acceptBtn = document.createElement('button');
+            acceptBtn.type = 'button';
+            acceptBtn.textContent = '接受';
+            const rejectBtn = document.createElement('button');
+            rejectBtn.type = 'button';
+            rejectBtn.className = 'reject';
+            rejectBtn.textContent = '拒绝';
+
+            acceptBtn.onclick = () => operate(lesson.id, 'accept', null, row);
+            rejectBtn.onclick = () => operate(lesson.id, 'reject', reasonInput.value, row);
+
+            actions.append(reasonInput, acceptBtn, rejectBtn);
+            row.appendChild(actions);
+            return row;
+        }
+
+        function renderLessons(lessons) {
+            lessonList.replaceChildren();
+            lessonList.appendChild(buildHeader());
+            if (lessons.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'empty';
+                empty.textContent = '暂无待确认的档期';
+                lessonList.appendChild(empty);
+                return;
+            }
+            lessons.forEach((lesson) => lessonList.appendChild(buildRow(lesson)));
+        }
+
+        function buildHeader() {
+            const head = document.createElement('div');
+            head.className = 'row head';
+            ['时间', '学科 / 类型', '学生', '操作'].forEach((label) => head.appendChild(buildCell(label)));
+            return head;
+        }
+
+        async function loadLessons() {
+            const body = await requestJson('/api/teacher/lessons?status=pending');
+            renderLessons(body);
+        }
+
+        async function operate(lessonId, action, reason, rowElement) {
+            clearError();
+            rowElement.querySelectorAll('button').forEach((btn) => { btn.disabled = true; });
+            try {
+                const init = { method: 'POST', headers: {} };
+                if (action === 'reject') {
+                    init.headers['Content-Type'] = 'application/json';
+                    init.body = JSON.stringify({ reason: reason || null });
+                }
+                await requestJson(`/api/teacher/lessons/${lessonId}/${action}`, init);
+                await loadLessons();
+            } catch (err) {
+                showError(err.message);
+                await loadLessons().catch(() => {});
+            }
+        }
+
+        async function init() {
+            try {
+                const me = await requestJson('/api/teacher/me');
+                document.getElementById('teacher-name').textContent = me.name;
+                document.getElementById('teacher-username').textContent = me.username;
+                await loadLessons();
+            } catch (err) {
+                if (err.message !== '未登录') showError(err.message);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

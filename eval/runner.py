@@ -17,6 +17,9 @@ EDDRunner: EDD 评估运行器 (Experiment-Driven Development)
    超时用线程 + 墙钟 deadline (Windows 上 langchain 请求无 request_timeout 时兜底)。
 6. --dry-run: 只校验评估集结构 + runner 编排 (不真调 LLM/检索), 供 CI 快速冒烟。
 7. --only routing,rag,...: 只跑指定子集 (逗号分隔)。
+8. rag 不需要 LLM: 只跑 rag (或 --dry-run) 时不创建 chat model, 无 key 机器也能跑门禁;
+   其余五类仍要真实模型。rag 走真检索链 (HybridVectorStore) + 确定性桩 embedding,
+   主体在 eval/rag_eval.py。
 
 用法 (用 .venv 跑):
     python -m eval.runner
@@ -38,7 +41,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from .gates import check_gates, format_failures, load_gates
+from .gates import check_gates, format_failures, format_partial, load_gates
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CASES_DIR = Path(__file__).resolve().parent / "cases"
@@ -301,6 +304,11 @@ class EDDRunner:
                 "accuracy": "每类各自定义: routing/slot/handoff 为逐 case 期望完全匹配的通过率; "
                             "rag 为 Recall@k 各 case 均值 (复用 RecallAtKEvaluator); "
                             "tool 为 tool_called 与期望一致的比例; safety 为拦截率",
+                "rag": "真检索链 HybridVectorStore (dense + BM25 + RRF + 精排); "
+                       "embedding 用确定性桩 (sha256→16 维, 离线可复现), "
+                       "EVAL_RAG_LIVE=1 时改用真实 embedding + query 变换 (结果不入门禁); "
+                       "同集跑 BM25 单路作对照 (bm25_baseline_*, 不入门禁); "
+                       "守卫: query 与语料最长公共子串 < 12 字 + 期望 doc 可达",
                 "latency_p95": "全部 case 的 wall-clock 耗时 (含网络/LLM), 排序取 95 分位",
                 "tokens": "优先读 LLM usage (prompt+completion); 拿不到按 len/4 估算 (中文场景保守口径)",
                 "max_steps": "tool 类=agentic 工具循环轮数; handoff 类=对话 turn 数; 其余=0",
@@ -312,6 +320,10 @@ class EDDRunner:
             "meta": {
                 "dry_run": self.dry_run,
                 "kinds": sorted(per_kind),
+                # 本次**请求跑**的类别 (--only 子集) —— gate 判定靠它区分
+                # 「这一类没跑 (skipped)」与「跑了但没产出指标 (failed)」。
+                # 缺这个字段 (如单测手搓 report) 时 gates 按全量模式处理。
+                "requested_kinds": sorted(self.only),
             },
         }
         # 门禁判定需要引用 report 自身 → 先建 dict 再补 check
@@ -355,60 +367,28 @@ class EDDRunner:
         return _summarize("routing", details)
 
     def _evaluate_rag(self) -> Dict[str, Any]:
-        """RAG 评估: 复用 RecallAtKEvaluator (Recall@k + MRR)。
+        """RAG 评估: **真检索链** (HybridVectorStore: dense + BM25 + RRF + 精排) + 多指标。
 
-        离线自包含: 用评估集内嵌的冻结 corpus (真实默认知识库原文) + BM25
-        (jieba 离线) 构造检索器, 不依赖远程 embedding API / 生产 DB。
+        与 v1 的区别 (spec §0): v1 只用 Bm25VectorStore 测「BM25 在 6 篇手写小文上
+        能否命中」, 门禁绿 ≠ 生产 RAG 可用; 现在切到生产同款混合检索器, 并用
+        **确定性桩 embedding** 保证离线可复现 (桩 patch 见 eval/rag_store.py)。
+
+        同一冻结集再跑一次 BM25 单路作为对照 (bm25_baseline_*), 只输出不入门禁。
+        守卫 (反逐字改写 / 悬空期望 / ground truth 可达性) 任一不过即抛错 → 门禁红。
         """
         data = load_cases("rag", self.cases_dir)
-        from services.components.base import QueryCase
-        from services.components.evaluators import RecallAtKEvaluator
-        from services.components.vector_stores import Bm25VectorStore
+        from .rag_eval import evaluate_rag
 
-        # 冻结 corpus → Bm25VectorStore (id/content/keywords 与 RecallAtKEvaluator 对齐)
-        corpus = [
-            {
-                "id": int(doc["doc_id"]),
-                "content": doc["content"],
-                "keywords": doc.get("keywords", []),
-            }
-            for doc in data.get("corpus", [])
-        ]
-        store = Bm25VectorStore()
-        store.add(corpus)
-
-        k = data.get("k", DEFAULT_K)
-        cases = [QueryCase(query=c["query"], expected_doc_ids=c["expected_doc_ids"]) for c in data["cases"]]
-        evaluator = RecallAtKEvaluator(cases, k=k)
-
-        # 每 case 计时: 包一层带计时的 store (RecallAtKEvaluator 内部逐 case 调 search)
-        latencies: List[float] = []
-
-        class _TimedStore:
-            def search(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
-                t0 = time.perf_counter()
-                out = store.search(query, top_k)
-                latencies.append((time.perf_counter() - t0) * 1000)
-                return out
-
-        out = evaluator.evaluate(_TimedStore())
-
-        details = []
-        for i, (c, cr) in enumerate(zip(data["cases"], out.get("case_results", []))):
-            ok = cr["recall"] >= 1.0
-            details.append({
-                "id": c["id"], "ok": ok,
-                "latency_ms": latencies[i] if i < len(latencies) else 0.0,
-                "tokens": 0, "steps": 0,
-                "expected": c["expected_doc_ids"],
-                "actual": cr.get("hit_ids", []),
-                "recall": cr.get("recall", 0.0),
-                "mrr": cr.get("mrr", 0.0),
-            })
-        return _summarize("rag", details, extra_metrics={
-            "recall_at_k": out.get("recall_at_k"),
-            "mrr": out.get("mrr"),
-        })
+        outcome = evaluate_rag(data, k=data.get("k", DEFAULT_K))
+        metrics = dict(outcome["metrics"])
+        result = _summarize("rag", outcome["details"], extra_metrics=metrics)
+        # `_summarize` 会过滤掉值为 None 的指标; 但 rerank_threshold 关闭时**必须**
+        # 以 null 显式出现在报告里 (证明阈值没生效), 所以这里补写回去。
+        if "rerank_threshold" in metrics:
+            result["metrics"]["rerank_threshold"] = metrics["rerank_threshold"]
+        # 诊断信息 (语料规模 / BM25 对照 NDCG / 精排模型名 / 守卫余量) 随 case 明细一起落报告
+        result["diagnostics"] = outcome.get("diagnostics", {})
+        return result
 
     def _evaluate_slot(self) -> Dict[str, Any]:
         """槽位评估: TrialInputParser.parse_stream + parse_data 提取字段与期望比对。"""
@@ -794,6 +774,16 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
+def _needs_llm(only: Optional[List[str]]) -> bool:
+    """评估子集里是否存在需要 LLM 的类别。
+
+    rag 完全不需要 LLM (确定性桩 embedding + 本地 hybrid 检索链);
+    routing / slot / tool / handoff / safety 都要真实模型。only=None 表示跑全部。
+    """
+    kinds = list(CASE_KINDS) if only is None else only
+    return any(kind != "rag" for kind in kinds)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI 入口: 跑评估 → 输出报告 → 门禁判定 → exit 0/1。"""
     args = _parse_args(argv)
@@ -812,8 +802,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     only = [k.strip() for k in args.only.split(",") if k.strip()] if args.only else None
 
+    # rag 评估不需要 LLM (走确定性桩 embedding + 本地检索链), 只跑 rag 时不许
+    # 因为缺 key 而炸掉 —— 否则「无凭据机器上跑不了 rag 门禁」就是死锁 (spec P0-2)。
     llm = None
-    if not args.dry_run:
+    if _needs_llm(only):
         from config.model_provider import create_chat_model
         llm = create_chat_model(temperature=0)
 
@@ -831,7 +823,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     check = report["gates"]["check"]
     print("\n" + "=" * 70)
     print(f"发布门禁: {format_failures(check)}")
+    if check.get("partial"):
+        # 子集模式 (--only): 未跑的类别标 skipped, exit code 只由已跑类别决定
+        print(format_partial(check))
     print("=" * 70)
+    # 全量模式语义不变: 9 项全查, 任一不达标 → exit 1。
+    # --only 模式: 未跑类别不计入 passed 判定, 已跑项全过即 exit 0 (partial)。
     return 0 if check["passed"] else 1
 
 

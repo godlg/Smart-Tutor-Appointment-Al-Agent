@@ -53,7 +53,14 @@ class FakeTrialAgent:
 
 
 class _StubTaskAgent:
-    """仅暴露 classification_processor.handoff_service（供 P2-3 挂起态判定）。"""
+    """图路径所需的最小会话级 agent 契约（不调用 LLM、不走 classify_task_stream）。
+
+    - `classification_processor.handoff_service`：供 P2-3 挂起态判定与 reply/resolve；
+    - `_checkpoint_loaded=True`：跳过 checkpoint 恢复门闩（无历史 checkpoint）；
+    - 图路径 `_build_orchestrator_graph` 要求编译图绑定的 agent 与会话 agent 为同一实例，
+      由 `_run` 中 `chat_handler._graph_bound_agent[THREAD_ID] = stub` 完成绑定，否则
+      注入的图会被丢弃并回落到 legacy（`classify_task_stream`）。
+    """
 
     def __init__(self, handoff_service):
         from types import SimpleNamespace
@@ -105,9 +112,8 @@ async def _drain(gen):
 
 async def _run(tmpdir):
     from api import chat_handler
-    from api.handoff import (ReplyHandoffRequest, list_session_messages,
-                             reply_handoff, resolve_handoff,
-                             ResolveHandoffRequest)
+    from api.handoff import (ReplyHandoffRequest, reply_handoff,
+                             resolve_handoff, ResolveHandoffRequest)
     from config.identity import legacy_identity
     from db.db_router import DatabaseRouter
     from services import human_handoff_service as hhs_module
@@ -145,7 +151,9 @@ async def _run(tmpdir):
     # 把会话级依赖接进 chat_handler（等价生产 _build_orchestrator_graph 的产物）。
     chat_handler._graph_compiled[THREAD_ID] = graph
     chat_handler._conversation_service = conversation
-    chat_handler._session_agents[SESSION_ID] = _StubTaskAgent(handoff)
+    stub_agent = _StubTaskAgent(handoff)
+    chat_handler._session_agents[SESSION_ID] = stub_agent
+    chat_handler._graph_bound_agent[THREAD_ID] = stub_agent
     ident = conversation.ensure_session(legacy_identity(SESSION_ID))
 
     print("=" * 78)
@@ -197,10 +205,10 @@ async def _run(tmpdir):
     check("小美" in (reply_resp.data.get("resume_output") or ""), "恢复输出应含客服回复")
     check(snap3.next == (), "resume 后不应再挂起")
 
-    # 4) 家长轮询 → 读到 parent + agent
-    poll = await list_session_messages(SESSION_ID)
-    msgs = poll.data
-    print("\n[4] 家长轮询 GET /api/handoffs/session/{id}/messages")
+    # 4) 家长轮询 → 读到 parent + agent（直接调服务层；HTTP 层归属校验已移到
+    #    tests/test_handoff_session_ownership.py 验证，demo 不依赖请求上下文）
+    msgs = handoff.get_messages_by_session(SESSION_ID)
+    print("\n[4] 家长轮询（服务层 get_messages_by_session；HTTP 归属校验见 tests/test_handoff_session_ownership.py）")
     print(f"  消息     : {[(m['role'], m['content']) for m in msgs]}")
     check([m["role"] for m in msgs] == ["parent", "agent"], "应读到 parent + agent")
 

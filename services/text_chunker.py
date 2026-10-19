@@ -6,7 +6,9 @@
 immutable: TextChunk 与 ChunkerSettings 是 frozen dataclass。
 
 设计要点:
-- chunk_size / chunk_overlap 可配置,默认 1000 / 200
+- chunk_size / chunk_overlap 可配置,默认 500 / 50
+  (与 config/components.yaml 的 splitter 参数一致; 500 中文字 ≈ 500 token < 512,
+  精排 cross-encoder 不再截断 chunk 后半段)
 - 中文友好:separators 包含 "。" "；" 等中文句末标点
 - 空文本抛 EmptyTextError,让上层统一捕获
 """
@@ -32,9 +34,9 @@ class TextChunk:
 
 @dataclass(frozen=True)
 class ChunkerSettings:
-    """分块器配置。"""
-    chunk_size: int = 1000
-    chunk_overlap: int = 200
+    """分块器配置。默认值与 config/components.yaml 的 splitter 参数保持一致。"""
+    chunk_size: int = 500
+    chunk_overlap: int = 50
 
 
 # 中英文混合友好的分隔符优先级:段落 > 行 > 句末标点 > 字

@@ -4,6 +4,11 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from ..models import Base
 
 
+# 库路径单一来源：db_router 也引用这个常量，避免两处字面量漂移。
+# 注意 DATABASE_URL 目前不参与解析（见 config/database.py 的 db_config，全仓无引用）。
+DEFAULT_DB_PATH = 'sqlite:///data/smart_appointment.db'
+
+
 class SessionManager:
     """
     数据库会话管理器
@@ -14,7 +19,7 @@ class SessionManager:
     3. 处理事务和异常回滚
     """
 
-    def __init__(self, db_path='sqlite:///data/smart_appointment.db'):
+    def __init__(self, db_path: str = DEFAULT_DB_PATH):
         """
         初始化会话管理器
 

@@ -51,6 +51,32 @@ HANDED_OFF_REPLY = (
 )
 
 
+def _login_console(client, tmp_path, monkeypatch, username="admin",
+                   password="admin12345", filename="console_handoff.db"):
+    """客服侧 API 已挂控制台闸门:显式临时库播种默认账号并登录拿 cookie。
+
+    显式传临时库路径,不依赖 ConsoleAuthService 的默认(生产)库。
+    """
+    from api.core import console_auth as console_dep
+    from config.console_auth import CONSOLE_COOKIE_NAME
+    from services.console_auth_service import ConsoleAuthService
+
+    console_db = f"sqlite:///{(tmp_path / filename).as_posix()}"
+    original_init = ConsoleAuthService.__init__
+
+    def _patched_init(self, db_path=None, *args, **kwargs):
+        original_init(self, db_path=db_path or console_db)
+
+    monkeypatch.setattr(ConsoleAuthService, "__init__", _patched_init)
+    monkeypatch.setattr(console_dep, "_console_auth_service", None, raising=False)
+    ConsoleAuthService(db_path=console_db).ensure_default_users()
+
+    response = client.post("/api/console/login",
+                           json={"username": username, "password": password})
+    assert response.status_code == 200, response.text
+    assert CONSOLE_COOKIE_NAME in response.cookies
+
+
 # ----------------------------------------------------------------------
 # 测试替身（不触网）
 # ----------------------------------------------------------------------
@@ -338,6 +364,7 @@ class TestHandoffAPI:
 
         用文件库(而非 :memory:)是因为 TestClient 在独立线程跑 app,
         :memory: 每个连接都是独立库,跨线程查不到表。
+        客服侧 API 已挂控制台闸门,故先用临时库的默认 admin 账号登录。
         """
         from fastapi.testclient import TestClient
         from app import app
@@ -359,6 +386,7 @@ class TestHandoffAPI:
 
         monkeypatch.setattr(HumanHandoffService, "__init__", _patched_init)
         client = TestClient(app)
+        _login_console(client, tmp_path, monkeypatch)
         yield client
         if shared["router"] is not None:
             shared["router"].close()

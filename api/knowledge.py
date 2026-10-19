@@ -1,11 +1,20 @@
 """
 知识库管理API
+
+面归属：机构后台面。整个 router 挂控制台闸门（路径与响应体形状不变），
+只允许 academic / admin 角色访问。
 """
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/knowledge", tags=["知识库管理"])
+from .core.console_auth import ROLE_ACADEMIC, ROLE_ADMIN, require_console_user
+
+router = APIRouter(
+    prefix="/api/knowledge",
+    tags=["知识库管理"],
+    dependencies=[Depends(require_console_user(ROLE_ADMIN, ROLE_ACADEMIC))],
+)
 
 # P1-13: 上传文件大小上限(10MB),超过抛 413
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024

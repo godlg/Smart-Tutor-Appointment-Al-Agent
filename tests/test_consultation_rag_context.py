@@ -7,6 +7,10 @@ RAG 检索带对话上下文 (consultation_rag_context) 单元测试
 3. ConsultationProcessor.process_consultation_stream 把 query_context 透传给 RAG
 4. 历史为空时 query_context 为空 → effective_query 与原始 query 相同
 
+本文件只验证 query_context 拼接与透传,与 query 变换无关,故 autouse 固定
+QUERY_TRANSFORM=off:底层收到的检索串恒为 [effective_query] 单条,断言不受
+变换规则增删影响(变换本身由 tests/test_query_transform.py 覆盖)。
+
 异步测试统一用 _run(coro) 同步包装(mock 知识库,不触发真实检索/LLM)。
 """
 import asyncio
@@ -14,9 +18,19 @@ import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from config.settings import settings  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _pin_query_transform_off(monkeypatch):
+    """固定 off 档,让本文件的断言只反映 query_context 拼接逻辑。"""
+    monkeypatch.setattr(settings, "query_transform_mode", "off")
 
 
 def _run(coro):
@@ -24,16 +38,19 @@ def _run(coro):
 
 
 def _make_retriever(mock_search):
-    """构造 KnowledgeRetriever,用 mock 顶替 knowledge_service.search 以隔离真实检索。
+    """构造 KnowledgeRetriever,用 mock 顶替 knowledge_service.search_multi 以隔离真实检索。
 
     固定 retrieval_mode='dense': 本测试只验证 query_context 透传逻辑,
     不受 .env RETRIEVAL_MODE 影响(hybrid 时 mock 的是另一条路径)。
+
+    底层检索入口是 search_multi(多查询检索, search() 是其单查询薄包装),
+    因为这会随 query 变换档位收到 1~N 条检索串。
     """
     from agents.consultant.knowledge_retriever import KnowledgeRetriever
     retriever = KnowledgeRetriever()
     retriever.retrieval_mode = "dense"  # 只测 dense 透传
     mock_service = MagicMock()
-    mock_service.search = mock_search
+    mock_service.search_multi = mock_search
     retriever.knowledge_service = mock_service
     retriever.kb_initialized = True  # 跳过真实初始化,直接走检索
     return retriever
@@ -48,8 +65,8 @@ class TestSearchKnowledgeQueryContext:
         retriever = _make_retriever(AsyncMock(return_value=[{"content": "doc"}]))
         docs = _run(retriever.search_knowledge("计算薄弱", top_k=3))
         assert docs  # 检索结果正常透传
-        retriever.knowledge_service.search.assert_awaited_once_with(
-            "计算薄弱", top_k=3, subject=None, grade_level=None
+        retriever.knowledge_service.search_multi.assert_awaited_once_with(
+            ["计算薄弱"], top_k=3, subject=None, grade_level=None
         )
 
     def test_with_query_context_splices_history_before_query(self):
@@ -58,8 +75,8 @@ class TestSearchKnowledgeQueryContext:
         _run(retriever.search_knowledge(
             "计算薄弱", top_k=3, query_context="用户: 初二学生,数学不好"
         ))
-        retriever.knowledge_service.search.assert_awaited_once_with(
-            "用户: 初二学生,数学不好\n计算薄弱", top_k=3,
+        retriever.knowledge_service.search_multi.assert_awaited_once_with(
+            ["用户: 初二学生,数学不好\n计算薄弱"], top_k=3,
             subject=None, grade_level=None,
         )
 
@@ -67,8 +84,8 @@ class TestSearchKnowledgeQueryContext:
         """query_context 为空串时,effective_query 应与原始 query 相同。"""
         retriever = _make_retriever(AsyncMock(return_value=[]))
         _run(retriever.search_knowledge("计算薄弱", query_context=""))
-        retriever.knowledge_service.search.assert_awaited_once_with(
-            "计算薄弱", top_k=3, subject=None, grade_level=None
+        retriever.knowledge_service.search_multi.assert_awaited_once_with(
+            ["计算薄弱"], top_k=3, subject=None, grade_level=None
         )
 
 
@@ -111,8 +128,8 @@ class TestConsultationProcessorQueryContext:
         assert "".join(out) == "回答"
 
         # 未注入 profile_provider → 不兜底;学科/年级从 query_context 抽出
-        retriever.knowledge_service.search.assert_awaited_once_with(
-            "用户: 初二,数学不行\n计算薄弱", top_k=3,
+        retriever.knowledge_service.search_multi.assert_awaited_once_with(
+            ["用户: 初二,数学不行\n计算薄弱"], top_k=3,
             subject="数学", grade_level="初中",
         )
 
@@ -123,8 +140,8 @@ class TestConsultationProcessorQueryContext:
 
         _run(self._collect(proc.process_consultation_stream("计算薄弱", "sess-1")))
 
-        retriever.knowledge_service.search.assert_awaited_once_with(
-            "计算薄弱", top_k=3, subject=None, grade_level=None
+        retriever.knowledge_service.search_multi.assert_awaited_once_with(
+            ["计算薄弱"], top_k=3, subject=None, grade_level=None
         )
 
 

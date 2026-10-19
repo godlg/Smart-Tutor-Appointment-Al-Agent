@@ -29,6 +29,14 @@ def test_critical_uniqueness_conflicts_block_startup_without_deleting_rows(tmp_p
         assert connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 2
 
 
+def test_default_db_path_has_single_source_of_truth():
+    """db_router 与 session_manager 的默认库路径必须来自同一常量,防止字面量漂移。"""
+    from db import db_router
+    from db.base import session_manager
+
+    assert db_router.DEFAULT_DB_PATH == session_manager.DEFAULT_DB_PATH
+
+
 def test_partial_unique_index_cannot_impersonate_full_message_constraint(tmp_path):
     from db.base.schema_migrator import run_migration
     path = tmp_path / "partial-index.db"

@@ -42,6 +42,8 @@ class PromptBuilder:
 
         context = "\n以下是相关的知识库信息：\n"
         for i, doc in enumerate(knowledge_docs, 1):
-            context += f"{i}. {doc['content']}\n"
+            # 来源编号 + 分类, 便于生成侧引用(如「据资料1」)
+            category = doc.get("category") or "未知"
+            context += f"[资料{i}|{category}] {doc['content']}\n"
         context += "\n请基于以上信息回答用户问题。如果知识库信息不足以回答问题，请基于教育学常识补充回答。\n"
         return context

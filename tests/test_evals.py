@@ -37,10 +37,15 @@ from eval.backfill import backfill  # noqa: E402
 # ===========================================================================
 
 def _make_report(metrics_override=None, kind_override=None):
-    """构造一份最小 report 供 check_gates 用。"""
+    """构造一份最小 report 供 check_gates 用。
+
+    rag 段带 v2 的全部门禁指标 (recall_at_k + empty_recall_rate):
+    gates.check_gates 对**报告里缺指标**的 gate 判失败, 合成报告少了
+    empty_recall_rate 会让 rag_max_empty_recall_rate 无谓地变红。
+    """
     base_metrics = {
         "routing": {"accuracy": 0.9},
-        "rag": {"recall_at_k": 0.9},
+        "rag": {"recall_at_k": 0.9, "empty_recall_rate": 0.0},
         "slot": {"accuracy": 0.9},
         "tool": {"accuracy": 0.9},
         "handoff": {"accuracy": 0.9},
@@ -146,6 +151,8 @@ class TestRunnerOrchestration:
                 }]
                 return _summarize(kind, details, extra_metrics={
                     "recall_at_k": accuracy if kind == "rag" else None,
+                    # v2 起 rag 还有上限型门禁空召回率; 缺了它 gate 会按「指标缺失」红
+                    "empty_recall_rate": 0.0 if kind == "rag" else None,
                 })
 
             return fake

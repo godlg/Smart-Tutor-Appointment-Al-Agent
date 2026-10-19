@@ -123,8 +123,7 @@ class LessonService:
         return (True, "调课成功") if success else (False, "调课失败")
 
     def update_lesson_status(self, lesson_id: int, status: str) -> bool:
-        return self.lesson_repo.update_lesson(lesson(lesson_id), status=status) \
-            if False else self.lesson_repo.update_lesson(lesson_id, status=status)
+        return self.lesson_repo.update_lesson(lesson_id, status=status)
 
     def update_lesson(self, lesson_id: int, **kwargs) -> bool:
         return self.lesson_repo.update_lesson(lesson_id, **kwargs)

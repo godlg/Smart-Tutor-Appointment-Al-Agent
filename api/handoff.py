@@ -1,5 +1,10 @@
 """
-人工接管 API（客服侧）
+人工接管 API
+
+面归属（两条面共用 `/api/handoffs` 前缀，但**分属两个 router**）：
+- 客服侧（`router`）：挂控制台闸门，只允许 support / admin。
+- 家长侧（`parent_side_router`）：`GET /session/{session_id}/messages` 供家长端轮询，
+  **不带任何控制台依赖**（C 端不能因为后台加闸门而误伤）。
 
 - GET  /api/handoffs?status=pending            拉取转人工记录(默认 pending)
 - POST /api/handoffs/{handoff_id}/resolve      标记某条记录已处理
@@ -7,16 +12,30 @@
 - POST /api/handoffs/{handoff_id}/reply        客服回复家长(不 resolve)
 - GET  /api/handoffs/{handoff_id}/messages     工单全部对话(升序)
 - GET  /api/handoffs/session/{session_id}/messages  家长侧拉取(升序,含客服回复)
+
+家长侧端点已做会话归属校验：无匿名身份 cookie 或会话属于他人 → 403（通用文案）；
+未出现过的 session_id 仍按首次出现绑定给当前身份，返回 200 + 空列表。
 """
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from .core.response_models import DataResponse
+from config.identity import IDENTITY_COOKIE_NAME
 
-router = APIRouter(prefix="/api/handoffs", tags=["人工接管"])
+from .core.console_auth import ROLE_ADMIN, ROLE_SUPPORT, require_console_user
+from .core.response_models import DataResponse
+from .identity import get_identity_service, resolve_request_identity
+
+router = APIRouter(
+    prefix="/api/handoffs",
+    tags=["人工接管"],
+    dependencies=[Depends(require_console_user(ROLE_SUPPORT, ROLE_ADMIN))],
+)
+
+# 家长侧轮询端点专用：同 prefix、同响应体，但**不带任何控制台依赖**。
+parent_side_router = APIRouter(prefix="/api/handoffs", tags=["人工接管"])
 
 
 class ResolveHandoffRequest(BaseModel):
@@ -59,10 +78,24 @@ async def list_handoffs(status: Optional[str] = "pending"):
     )
 
 
-@router.get("/session/{session_id}/messages", response_model=DataResponse, summary="家长侧拉取会话消息")
-async def list_session_messages(session_id: str):
-    """家长侧拉取该会话全部消息（升序，含客服回复）。"""
+@parent_side_router.get("/session/{session_id}/messages", response_model=DataResponse, summary="家长侧拉取会话消息")
+async def list_session_messages(session_id: str, request: Request):
+    """家长侧拉取该会话全部消息（升序，含客服回复）。
+
+    先校验会话归属：无身份 cookie 直接 403（不签发新身份、不写库）；已绑定给他人的会话
+    同样 403（通用文案，不含消息内容/条数）；未出现过的 session_id 按既有语义绑定给当前
+    身份并返回空列表。
+    """
     from services.human_handoff_service import HumanHandoffService
+    from services.identity_service import SessionOwnershipError, StudentClaimError
+
+    if not request.cookies.get(IDENTITY_COOKIE_NAME):
+        raise HTTPException(status_code=403, detail="该会话不属于当前身份")
+    identity = resolve_request_identity(request)
+    try:
+        get_identity_service().assert_session_owned(identity, session_id)
+    except (SessionOwnershipError, StudentClaimError) as exc:
+        raise HTTPException(status_code=exc.status_code, detail="该会话不属于当前身份") from exc
 
     svc = HumanHandoffService()
     messages = svc.get_messages_by_session(session_id)
